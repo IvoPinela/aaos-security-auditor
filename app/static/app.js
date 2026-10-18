@@ -95,6 +95,17 @@ function renderReport(report) {
     .map((severity) => `<span class="risk-meter-segment ${severity}" style="width:${(Number(severityCounts[severity]) / Math.max(count, 1)) * 100}%" title="${severity}: ${Number(severityCounts[severity])}"></span>`)
     .join('');
   results.querySelector('.meta')?.insertAdjacentHTML('afterend', `<div class="risk-meter"><span class="risk-meter-label">Findings distribution</span><span class="risk-meter-total">${count} total</span><div class="risk-meter-track" role="img" aria-label="Severity distribution: ${escapeHtml(severitySummary)}">${meterSegments}</div></div>`);
+  const policy = report.policy;
+  if (policy && (policy.suppressed || (policy.warnings || []).length || (policy.expired || []).length)) {
+    const note = document.createElement('p');
+    note.className = 'privacy-note';
+    const parts = [`${policy.suppressed || 0} finding(s) suppressed with a recorded reason`];
+    if ((policy.expired || []).length) parts.push(`${policy.expired.length} suppression(s) expired and active again`);
+    if ((policy.unused || []).length) parts.push(`${policy.unused.length} stale`);
+    if ((policy.warnings || []).length) parts.push(`warnings: ${policy.warnings.join(' | ')}`);
+    note.textContent = `Policy ${policy.config || 'aaos.toml'}: ${parts.join(' · ')}.`;
+    results.querySelector('.report-actions')?.after(note);
+  }
   results.hidden = false;
   results.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
@@ -217,7 +228,9 @@ function renderComparison() {
     box.innerHTML = '<strong>Cannot compare:</strong> the package differs from the baseline.';
     return;
   }
-  const keyFor = (finding) => `${finding.rule_id}::${finding.evidence}`;
+  // Fingerprints survive line shifts; fall back to evidence when either report predates them.
+  const allFingerprinted = [...(baselineReport.findings || []), ...(latestReport.findings || [])].every((finding) => finding.fingerprint);
+  const keyFor = (finding) => `${finding.rule_id}::${allFingerprinted ? finding.fingerprint : finding.evidence}`;
   const before = new Map((baselineReport.findings || []).map((finding) => [keyFor(finding), finding]));
   const after = new Map((latestReport.findings || []).map((finding) => [keyFor(finding), finding]));
   const added = [...after].filter(([key]) => !before.has(key)).map(([, finding]) => finding);

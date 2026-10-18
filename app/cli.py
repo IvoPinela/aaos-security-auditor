@@ -15,6 +15,7 @@ from app.directory_scanner import ALLOWED_SUFFIXES, IGNORED_PARTS, MAX_SOURCE_FI
 from app.exporters import SEVERITY_ORDER, compare_with_baseline, filter_by_severity, to_markdown, to_sarif
 from app.knowledge import validate_knowledge_base
 from app.pentest_plan import build_pentest_plan
+from app.policy import apply_policy, load_project_policy, parse_policy
 from app.rules_catalog import known_rule_ids, rule_catalog
 from app.threat_model import build_threat_model
 
@@ -75,7 +76,7 @@ def _load_baseline(path: Path) -> dict[str, Any]:
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Read-only static Android/AAOS source audit")
     parser.add_argument("directory", type=Path, nargs="?", help="Authorized Android project directory")
-    parser.add_argument("--profile", choices=("android_app", "aaos"), default="aaos")
+    parser.add_argument("--profile", choices=("android_app", "aaos"), default=None, help="Rule profile (default: aaos, or settings.profile from aaos.toml)")
     parser.add_argument("--format", choices=("json", "sarif", "markdown", "ai-context"), default="json", help="Output format; ai-context is a Markdown briefing for an AI assistant")
     parser.add_argument(
         "--import", dest="imports", action="append", type=Path, default=[], metavar="REPORT",
@@ -84,11 +85,13 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--no-locations", action="store_true", help="ai-context: omit path:line (use when the briefing leaves your machine)")
     parser.add_argument("--list-connectors", action="store_true", help="Print supported external report formats and exit")
     parser.add_argument("--output", "-o", type=Path, help="Write the report to this file instead of stdout")
-    parser.add_argument("--min-severity", choices=SEVERITY_ORDER, default="info", help="Hide findings below this severity")
+    parser.add_argument("--min-severity", choices=SEVERITY_ORDER, default=None, help="Hide findings below this severity (default: info, or settings.min_severity)")
     parser.add_argument(
-        "--fail-on", choices=("none", *SEVERITY_ORDER), default="none",
-        help="Exit with code 1 when a finding at or above this severity exists (only new findings with --baseline)",
+        "--fail-on", choices=("none", *SEVERITY_ORDER), default=None,
+        help="Exit with code 1 when a finding at or above this severity exists (only new findings with --baseline); default none, or settings.fail_on",
     )
+    parser.add_argument("--config", type=Path, help="Policy file (default: aaos.toml found in the project)")
+    parser.add_argument("--no-config", action="store_true", help="Ignore aaos.toml (no suppressions or settings)")
     parser.add_argument("--baseline", type=Path, help="Earlier JSON report; adds new/resolved comparison")
     parser.add_argument("--list-rules", action="store_true", help="Print the rule catalog and exit")
     parser.add_argument("--check-knowledge", action="store_true", help="Validate knowledge/security_notes.json and exit")
@@ -116,9 +119,17 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.directory is None:
         parser.error("provide the directory to analyze (or use --list-rules / --check-knowledge)")
 
+    settings: dict = {}
     try:
         source_files = collect_source_files(args.directory)
-        report = analyze_source_directory(source_files, profile=args.profile)
+        policy, policy_path, policy_root = None, "", ""
+        if not args.no_config:
+            if args.config:
+                policy, policy_path = parse_policy(args.config.read_text(encoding="utf-8")), args.config.name
+            else:
+                policy, policy_path, policy_root = load_project_policy(source_files)
+        settings = policy.settings if policy else {}
+        report = analyze_source_directory(source_files, profile=args.profile or settings.get("profile", "aaos"))
         import_summaries = []
         for import_path in args.imports:
             imported = import_static_report(import_path.read_bytes(), import_path.name)
@@ -126,6 +137,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             import_summaries.append({"file": import_path.name, "connector": imported["connector"], **imported["stats"]})
         if import_summaries:
             report["imported_reports"] = import_summaries
+        if policy:
+            apply_policy(report, policy, source_files, root_prefix=policy_root, config_path=policy_path)
         report["pentest_plan"] = build_pentest_plan(report["findings"], report.get("deep_links", []))
         report["threat_model"] = build_threat_model(report)
         if args.baseline:
@@ -134,11 +147,13 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(json.dumps({"error": str(exc)}, ensure_ascii=False), file=sys.stderr)
         return 2
 
+    fail_on = args.fail_on or settings.get("fail_on", "none")
+    min_severity = args.min_severity or settings.get("min_severity", "info")
     gate_findings = report["baseline_comparison"]["new"] if args.baseline else report["findings"]
-    gate_failed = args.fail_on != "none" and bool(filter_by_severity(gate_findings, args.fail_on))
+    gate_failed = fail_on != "none" and bool(filter_by_severity(gate_findings, fail_on))
 
-    if args.min_severity != "info":
-        report["findings"] = filter_by_severity(report["findings"], args.min_severity)
+    if min_severity != "info":
+        report["findings"] = filter_by_severity(report["findings"], min_severity)
     if args.format == "sarif":
         output = json.dumps(to_sarif(report), ensure_ascii=False, indent=2)
     elif args.format == "markdown":
@@ -153,7 +168,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     else:
         print(output)
     if gate_failed:
-        print(f"Gate failed: findings exist with severity >= {args.fail_on}.", file=sys.stderr)
+        print(f"Gate failed: findings exist with severity >= {fail_on}.", file=sys.stderr)
         return 1
     return 0
 

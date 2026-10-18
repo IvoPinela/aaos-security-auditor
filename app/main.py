@@ -21,6 +21,7 @@ from app.exporters import to_markdown, to_sarif
 from app.knowledge import knowledge_base_status, notes_for_rule, retrieve_context, search_notes
 from app.masvs import MASVS_CONTROLS, MASVS_VERSION, enrich_findings
 from app.pentest_plan import build_pentest_plan
+from app.policy import apply_policy, load_project_policy
 from app.rules_catalog import rule_catalog
 from app.scanner import analyze_apk
 from app.threat_model import build_threat_model
@@ -116,6 +117,14 @@ async def analyze_directory(
                 raise HTTPException(status_code=413, detail="The directory exceeds the 20 MB total limit.")
             source_files[relative_path] = data
         report = analyze_source_directory(source_files, profile=profile)
+        try:
+            policy, policy_path, policy_root = load_project_policy(source_files)
+        except ValueError as exc:
+            # A broken policy must not hide findings: report it and keep every finding.
+            report["policy"] = {"config": "aaos.toml", "suppressed": 0, "by_kind": {}, "expired": [], "unused": [], "warnings": [str(exc)]}
+        else:
+            if policy:
+                apply_policy(report, policy, source_files, root_prefix=policy_root, config_path=policy_path)
     except json.JSONDecodeError as exc:
         raise HTTPException(status_code=422, detail="The directory path list is not valid JSON.") from exc
     except ValueError as exc:

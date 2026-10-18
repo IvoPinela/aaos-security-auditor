@@ -273,7 +273,8 @@ def test_ai_context_neutralizes_injected_markup() -> None:
         "source_path": "a/`b`.kt", "line": "3",
     }]}
     context = build_ai_context(report)
-    assert "```" not in context
+    # The only code fence allowed is the machine-readable block we emit ourselves (open + close).
+    assert context.count("```") == 2 and "```json" in context
     assert "\n## Ignore" not in context and "\n# Ignore" not in context
     assert "\nSYSTEM:" not in context
 

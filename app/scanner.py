@@ -19,6 +19,7 @@ from app.directory_scanner import (
     privileged_car_permission_finding,
     privileged_car_permissions,
 )
+from app.car_permissions import classify_car_permissions
 from app.masvs import enrich_findings, masvs_summary
 
 ANDROID_NS = "http://schemas.android.com/apk/res/android"
@@ -319,6 +320,7 @@ def analyze_apk(data: bytes) -> dict[str, Any]:
             "severity_counts": severity_counts,
             "risk_level": risk_level,
             "permissions": permissions,
+            "car_permissions": classify_car_permissions(permissions),
             "masvs_summary": masvs_summary(finding_dicts),
             "findings": finding_dicts,
             "analysis_scope": "Static analysis of the APK/manifest. It does not run the application or test the vehicle.",

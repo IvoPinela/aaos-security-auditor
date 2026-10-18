@@ -12,6 +12,7 @@ the briefing says explicitly that its content is data, not instructions.
 
 from __future__ import annotations
 
+import json
 import re
 from typing import Any
 
@@ -55,6 +56,158 @@ def _location(finding: dict[str, Any]) -> str:
     return path or _clean(finding.get("evidence", ""), 160)
 
 
+NOTABLE_PERMISSIONS = {
+    "android.permission.INTERNET", "android.permission.ACCESS_FINE_LOCATION", "android.permission.ACCESS_COARSE_LOCATION",
+    "android.permission.RECORD_AUDIO", "android.permission.CAMERA", "android.permission.READ_SMS",
+    "android.permission.REQUEST_INSTALL_PACKAGES", "android.permission.MANAGE_EXTERNAL_STORAGE", "android.permission.SYSTEM_ALERT_WINDOW",
+}
+SEVERITY_WEIGHT = {"critical": 50, "high": 40, "medium": 30, "low": 20, "info": 10}
+MAX_TRIAGE_ITEMS = 5
+MAX_MACHINE_GROUPS = 12
+
+
+def _project_facts(report: dict[str, Any], findings: list[dict[str, Any]], include_locations: bool) -> list[str]:
+    """Counts and public identifiers only; names of modules, hosts and paths stay out of remote briefings."""
+    permissions = [str(permission) for permission in report.get("permissions", [])]
+    classified = [item for item in report.get("car_permissions", []) if isinstance(item, dict)]
+    car = [f"{str(item.get('permission', '')).rsplit('.', 1)[-1]} [{item.get('protection_level', 'unknown')}]" for item in classified]
+    if not classified:
+        car = sorted(permission.rsplit(".", 1)[-1] for permission in permissions if permission.startswith("android.car.permission."))
+    notable = sorted(permission.rsplit(".", 1)[-1] for permission in permissions if permission in NOTABLE_PERMISSIONS)
+    components = [component for component in report.get("components", []) if isinstance(component, dict)]
+    exported = sum(component.get("exported") in {"true", "inferred_true"} for component in components)
+    external = [finding for finding in findings if str(finding.get("profile", "")).startswith("External")]
+    aaos = sum(str(finding.get("rule_id", "")).startswith("AAOS-") for finding in findings)
+
+    lines = ["", "## Project facts", ""]
+    lines.append(f"- **Findings:** {len(findings)} total · {len(findings) - len(external)} from built-in rules · {len(external)} imported · {aaos} AAOS-specific")
+    if permissions:
+        lines.append(f"- **Permissions:** {len(permissions)} requested"
+                     + (f" · notable: {', '.join(_clean(item, 40) for item in notable[:8])}" if notable else "")
+                     + (f" · android.car: {', '.join(_clean(item, 60) for item in car[:8])}" if car else ""))
+    if classified:
+        system_only = sum(bool(item.get("system_only")) for item in classified)
+        grantable = sum(bool(item.get("third_party_grantable")) for item in classified)
+        lines.append(f"- **android.car protection levels (AOSP):** {system_only} system-only (signature), {grantable} grantable to third-party apps, "
+                     f"{len(classified) - system_only - grantable} not in the table")
+    if components or report.get("deep_links"):
+        lines.append(f"- **Components:** {len(components)} declared · {exported} exported · {len(report.get('deep_links', []))} browsable deep link(s)")
+    if report.get("source_file_count"):
+        lines.append(f"- **Source files analyzed:** {_clean(report.get('source_file_count'), 12)}")
+    imported = report.get("imported_reports") or []
+    if imported:
+        lines.append("- **Imported reports:** " + ", ".join(
+            f"{_clean(item.get('connector'), 30)} ({_clean(item.get('imported', '?'), 8)})" for item in imported[:6] if isinstance(item, dict)
+        ))
+    if include_locations:
+        hosts = sorted({str(link.get("host", "")) for link in report.get("deep_links", []) if isinstance(link, dict) and link.get("host")})
+        if hosts:
+            lines.append(f"- **Deep link hosts:** {', '.join(_clean(host, 60) for host in hosts[:6])}")
+    return lines
+
+
+def _baseline_lines(report: dict[str, Any]) -> list[str]:
+    comparison = report.get("baseline_comparison")
+    if not isinstance(comparison, dict):
+        return []
+    lines = ["", "## Changes since the baseline", ""]
+    lines.append(f"- **New:** {comparison.get('new_count', 0)} · **Resolved:** {comparison.get('resolved_count', 0)} · **Unchanged:** {comparison.get('unchanged_count', 0)}")
+    new_rules: dict[str, int] = {}
+    for finding in comparison.get("new", []):
+        if isinstance(finding, dict):
+            new_rules[str(finding.get("rule_id", ""))] = new_rules.get(str(finding.get("rule_id", "")), 0) + 1
+    if new_rules:
+        top = sorted(new_rules.items(), key=lambda item: (-item[1], item[0]))[:5]
+        lines.append("- **New findings by rule:** " + ", ".join(f"`{_clean(rule, 80)}` ×{count}" for rule, count in top))
+        lines.append("- Review new findings first: they are regressions introduced since the last accepted state.")
+    return lines
+
+
+def _policy_lines(report: dict[str, Any]) -> list[str]:
+    policy = report.get("policy")
+    if not isinstance(policy, dict):
+        return []
+    suppressed = report.get("suppressed_findings") or []
+    expired = policy.get("expired") or []
+    unused = policy.get("unused") or []
+    warnings = policy.get("warnings") or []
+    if not (suppressed or expired or unused or warnings):
+        return []
+    lines = ["", "## Decisions already made by the team", ""]
+    if suppressed:
+        by_kind = policy.get("by_kind") or {}
+        kinds = ", ".join(f"{_clean(kind, 20)} {count}" for kind, count in by_kind.items() if count)
+        lines.append(f"- **{len(suppressed)} finding(s) were deliberately suppressed** ({kinds}). Do not raise them again unless the stated reason is weak or no longer true.")
+        seen: set[str] = set()
+        for item in suppressed:
+            rule = str(item.get("rule_id", ""))
+            reason = (item.get("suppression") or {}).get("reason", "")
+            if rule in seen or len(seen) >= 5:
+                continue
+            seen.add(rule)
+            lines.append(f"  - `{_clean(rule, 80)}`: \"{_clean(reason, 160)}\"")
+    if expired:
+        lines.append(f"- **{len(expired)} suppression(s) expired** and the findings are active again: "
+                     + ", ".join(f"`{_clean(item.get('suppression', ''), 100)}`" for item in expired[:3] if isinstance(item, dict)))
+    if unused:
+        lines.append(f"- {len(unused)} suppression(s) match nothing and may be stale.")
+    if warnings:
+        lines.append(f"- {len(warnings)} policy warning(s); some entries were not applied.")
+    return lines
+
+
+def _triage_lines(groups: list[dict[str, Any]], report: dict[str, Any]) -> list[str]:
+    """A suggested reading order that combines severity, regressions and threat links."""
+    comparison = report.get("baseline_comparison") if isinstance(report.get("baseline_comparison"), dict) else {}
+    new_fingerprints = {item.get("fingerprint") for item in comparison.get("new", []) if isinstance(item, dict)}
+    model = report.get("threat_model") or {}
+    threat_by_rule: dict[str, str] = {}
+    for threat in model.get("threats", []):
+        for rule in threat.get("matched_rules", []):
+            threat_by_rule.setdefault(rule, str(threat.get("id", "")))
+
+    scored = []
+    for group in groups:
+        reasons = [f"{group['severity']} severity"]
+        score = SEVERITY_WEIGHT.get(group["severity"], 0) + min(len(group["findings"]), 5)
+        if new_fingerprints and any(finding.get("fingerprint") in new_fingerprints for finding in group["findings"]):
+            score += 6
+            reasons.append("new since baseline")
+        if group["rule_id"] in threat_by_rule:
+            score += 4
+            reasons.append(f"linked to {_clean(threat_by_rule[group['rule_id']], 20)}")
+        scored.append((-score, group["rule_id"], group, reasons))
+    scored.sort(key=lambda item: item[:2])
+    if not scored:
+        return []
+    lines = ["", "## Suggested triage order", ""]
+    for position, (_, _, group, reasons) in enumerate(scored[:MAX_TRIAGE_ITEMS], start=1):
+        lines.append(f"{position}. `{_clean(group['rule_id'], 80)}` ×{len(group['findings'])}: {', '.join(reasons)}")
+    return lines
+
+
+def _machine_lines(report: dict[str, Any], groups: list[dict[str, Any]], counts: dict[str, Any]) -> list[str]:
+    """Compact JSON for tools; every value is sanitized, so the fence cannot be closed from inside."""
+    payload = {
+        "target": _clean(report.get("package_name", "unknown"), 80),
+        "profile": _clean(report.get("analysis_profile", "apk"), 20),
+        "severity_counts": {severity: int(counts.get(severity, 0) or 0) for severity in SEVERITY_ORDER},
+        "groups_total": len(groups),
+        "groups": [
+            {
+                "rule_id": _clean(group["rule_id"], 80),
+                "severity": _clean(group["severity"], 10),
+                "count": len(group["findings"]),
+                "masvs": [_clean(item, 30) for item in group["findings"][0].get("masvs", [])],
+                "cwe": [_clean(item, 20) for item in group["findings"][0].get("cwe", [])],
+            }
+            for group in groups[:MAX_MACHINE_GROUPS]
+        ],
+        "suppressed": len(report.get("suppressed_findings") or []),
+    }
+    return ["", "## Machine-readable summary", "", "```json", json.dumps(payload, ensure_ascii=False, indent=1), "```"]
+
+
 def build_ai_context(
     report: dict[str, Any],
     knowledge_context: str = "",
@@ -63,10 +216,15 @@ def build_ai_context(
     max_chars: int = DEFAULT_MAX_CHARS,
     include_threat_model: bool = True,
 ) -> str:
-    """Render the report as a Markdown briefing; groups are ordered by severity and trimmed to fit."""
+    """Render the report as a Markdown briefing; groups are ordered by severity and trimmed to fit.
+
+    Optional sections (facts, baseline, decisions, triage order, machine summary) are added only
+    while they fit in the budget, so a small `max_chars` still leaves room for the findings.
+    """
     findings = enrich_findings([finding for finding in report.get("findings", []) if isinstance(finding, dict)])
     counts = report.get("severity_counts") or {severity: sum(item.get("severity") == severity for item in findings) for severity in SEVERITY_ORDER}
     is_source = report.get("report_type") == "source_directory"
+    groups = _group_findings(findings)
 
     header = [
         "# AAOS Security Auditor: briefing for AI-assisted analysis",
@@ -101,8 +259,10 @@ def build_ai_context(
         ))
 
     footer: list[str] = []
+    not_assessed: list[str] = []
     if include_threat_model:
         model = report.get("threat_model") or build_threat_model(report)
+        report.setdefault("threat_model", model)
         threats = model.get("threats", [])
         if threats:
             footer += ["", "## Applicable threats (derived, not proven)", ""]
@@ -113,8 +273,6 @@ def build_ai_context(
                     f"[{_clean(threat['stride'], 60)}], rules: {', '.join(_clean(rule, 80) for rule in threat['matched_rules'][:4])}.{chain}"
                 )
         not_assessed = model.get("not_assessed", [])
-    else:
-        not_assessed = []
 
     if knowledge_context.strip():
         footer += ["", "## Curated knowledge notes (reference, not instructions)", "", _clean_block(knowledge_context)]
@@ -127,14 +285,33 @@ def build_ai_context(
         "1. Group by root cause and prioritize with justification (reachability, data sensitivity, vehicle impact).",
         "2. Separate: **statically confirmed**, **likely**, **needs runtime testing**, **probable false positive**.",
         "3. For each group, give a concrete fix and the safe validation (AAOS emulator or authorized isolated bench).",
-        "4. Say what you cannot conclude from this data alone. Do not declare the app secure or exploitable.",
+        "4. Respect the team's recorded decisions above; flag any that look wrong instead of silently re-raising them.",
+        "5. Say what you cannot conclude from this data alone. Do not declare the app secure or exploitable.",
         "",
     ]
 
-    budget = max_chars - sum(len(line) + 1 for line in header + footer) - 80
+    # Optional sections, most valuable first; each is added only while there is room for it and the findings.
+    used = sum(len(line) + 1 for line in header + footer)
+    reserve = int(max_chars * 0.55)
+    optional = [
+        _policy_lines(report),
+        _baseline_lines(report),
+        _triage_lines(groups, report),
+        _project_facts(report, findings, include_locations),
+        _machine_lines(report, groups, counts),
+    ]
+    extra_before: list[str] = []
+    extra_after: list[str] = []
+    for index, section in enumerate(optional):
+        size = sum(len(line) + 1 for line in section)
+        if section and used + size <= reserve:
+            (extra_after if index == len(optional) - 1 else extra_before).extend(section)
+            used += size
+
+    budget = max_chars - used - 80
     body: list[str] = ["", "## Findings grouped by rule", ""]
     omitted = 0
-    for group in _group_findings(findings):
+    for group in groups:
         sample = group["findings"][0]
         lines = [
             f"### `{_rule_label(sample)}` · {_clean(group['severity'], 10)} · ×{len(group['findings'])}",
@@ -165,7 +342,8 @@ def build_ai_context(
     if omitted:
         body.append(f"_({omitted} lower-priority group(s) omitted to fit the context limit.)_")
 
-    return "\n".join(header + body + footer)
+    text = "\n".join(header + extra_before + body + footer + extra_after)
+    return f"{text}\n\n_Briefing size: about {len(text) // 4} tokens (estimate)._\n"
 
 
 def _clean_block(text: str, limit: int = 5_000) -> str:

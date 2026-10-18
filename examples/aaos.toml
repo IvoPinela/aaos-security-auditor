@@ -1,0 +1,28 @@
+# Copy this file to the root of your Android project as `aaos.toml`.
+# The CLI and the web app pick it up automatically (use --no-config to ignore it).
+
+[settings]
+profile = "aaos"            # aaos | android_app (the --profile flag overrides it)
+fail_on = "high"            # exit code 1 at or above this severity (the --fail-on flag overrides it)
+min_severity = "low"        # hide anything below this severity in the output
+ignore_paths = [            # glob patterns, relative to the project root
+  "**/src/test/**",
+  "**/src/androidTest/**",
+]
+disabled_rules = [          # rules that do not apply to this product at all
+  "ANDROID-HTTP-URL",
+]
+
+# Every suppression needs a reason. Add `expires` so decisions are revisited,
+# and `author` so people know whom to ask. Stale or expired entries are reported.
+[[suppress]]
+rule = "ANDROID-WEAK-HASH"
+path = "app/src/main/java/com/example/ImageCache.kt"
+reason = "MD5 is only used to build cache keys, never for security"
+author = "ivo"
+expires = 2027-01-01
+
+# Inline form, on the flagged line or the line above (a reason is required):
+#   // aaos-ignore[ANDROID-WEAK-HASH]: MD5 used for cache keys only
+# In an AndroidManifest.xml, one comment anywhere in the file covers that rule for the file:
+#   <!-- aaos-ignore[ANDROID-BACKUP-ENABLED]: backups are intended, rules reviewed -->

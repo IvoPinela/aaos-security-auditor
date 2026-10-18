@@ -11,7 +11,7 @@ Find what matters in an in-vehicle app **before it reaches the road**: reproduci
 ![Rules](https://img.shields.io/badge/rules-54-orange)
 ![Standards](https://img.shields.io/badge/OWASP%20MASVS-v2-red)
 ![Output](https://img.shields.io/badge/SARIF-2.1.0-purple)
-![Tests](https://img.shields.io/badge/tests-78%20passing-brightgreen)
+![Tests](https://img.shields.io/badge/tests-113%20passing-brightgreen)
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Status](https://img.shields.io/badge/status-MVP%20%C2%B7%20pentest%20workflow%20evolving-yellow)
 
@@ -46,7 +46,8 @@ Generic mobile scanners know nothing about that chain. This tool does: it flags 
 | 🛡️ **Derived threat model** | Attack surface, STRIDE threats and a 7-phase manual validation plan |
 | 🤖 **AI-ready by default** | A sanitized Markdown briefing for Claude or any assistant, hardened against prompt injection |
 | 🧠 **Curated knowledge base** | 33 notes retrieved per rule, with MASVS, CWE and primary sources |
-| ⚙️ **CI-ready CLI** | SARIF for GitHub code scanning, `--fail-on`, baselines that gate only on *new* findings |
+| ⚙️ **CI-ready CLI** | SARIF for GitHub code scanning, `--fail-on`, baselines that gate only on *new* findings, stable fingerprints |
+| 🗂️ **Project policy** | `aaos.toml` with settings and **justified, expiring suppressions**, plus inline `aaos-ignore` comments |
 | 🧰 **Claude Code skills** | Triage, remediation, CI gate, threat modeling and rule authoring |
 
 ## How it works
@@ -169,7 +170,7 @@ The validation plan ships as a checklist for an **isolated AAOS emulator or benc
 
 | Check | Why it matters |
 | --- | --- |
-| `AAOS-PRIVILEGED-CAR-PERMISSION` | `CONTROL_CAR_*`, `CAR_VENDOR_EXTENSION`, diagnostics and detailed telemetry. Many are `signature\|privileged`, so a request shows intent, not granted capability |
+| `AAOS-PRIVILEGED-CAR-PERMISSION` | Table-driven from the **AOSP protection levels** of all 156 `android.car` permissions. `signature\|privileged` ones (for example `CONTROL_CAR_CLIMATE`) are never granted to a normal third-party app, so the finding explains when it matters; `dangerous` ones (for example `CAR_SPEED`) *can* be granted and feed the privacy review |
 | `AAOS-VEHICLE-API-REVIEW` | `android.car` and `CarPropertyManager` usage to validate per API, property and OEM |
 | `AAOS-DATA-EGRESS-REVIEW` | INTERNET plus location or vehicle data can reveal routes and habits |
 | `AAOS-FEATURE-UNCONFIRMED` | Missing `android.hardware.type.automotive` declaration |
@@ -193,6 +194,35 @@ Run the tool in your own authorized environment, then import the report. Format 
 | MobSF | JSON | Export the static analysis report |
 
 Only rule ID, severity, CWE, confidence and `path:line` (or `package@version`) are kept. **Messages, excerpts, matched text and secret values are discarded.** SARIF suppressions are skipped, absolute paths are trimmed to project-relative, and Lint XML with `DOCTYPE`/`ENTITY` is refused.
+
+## Project policy and suppressions
+
+Real projects have known false positives and accepted risks. Put a policy file named `aaos.toml` at the project root (see [examples/aaos.toml](examples/aaos.toml)); the CLI and the web app find it automatically.
+
+```toml
+[settings]
+fail_on = "high"
+ignore_paths = ["**/src/test/**"]
+disabled_rules = ["ANDROID-HTTP-URL"]
+
+[[suppress]]
+rule = "ANDROID-WEAK-HASH"
+path = "app/src/main/java/ImageCache.kt"
+reason = "MD5 is only used to build cache keys, never for security"
+author = "ivo"
+expires = 2027-01-01
+```
+
+Suppressions are designed so that a decision is never hidden:
+
+- A **reason is mandatory**; entries without one are skipped with a warning.
+- They can **expire**. An expired entry stops applying and the finding returns, and the report says so.
+- **Stale entries** that match nothing are reported.
+- Suppressed findings are kept in the report (`suppressed_findings`) with their reason, shown in the Markdown export, emitted as native **SARIF `suppressions`** with the justification, and passed to the AI briefing so it does not re-raise them.
+- A **broken `aaos.toml` never hides findings**: the CLI exits with code `2`, and the web app reports a warning and keeps every finding.
+- Inline form: `// aaos-ignore[RULE-ID]: reason` on the flagged line or the line above. In `AndroidManifest.xml`, one comment anywhere in the file covers that rule for the file.
+
+**Stable fingerprints.** Every finding has a `fingerprint` that survives line shifts and never depends on a secret's value. Baselines compare by fingerprint, so moving code around does not create false "new" findings, and SARIF carries it as `partialFingerprints` so GitHub code scanning keeps alerts open instead of recreating them.
 
 ## Claude Code skills
 
@@ -221,6 +251,7 @@ Each ships with evaluation cases. Dynamic-action skills (Frida, objection) were 
 | `--fail-on <sev>` | Exit `1` at or above a severity |
 | `--min-severity <sev>` | Hide lower severities in the output |
 | `--no-locations` | `ai-context`: omit `path:line` |
+| `--config <file>` · `--no-config` | Use a specific policy file, or ignore `aaos.toml` |
 | `--list-rules` · `--list-connectors` · `--check-knowledge` | Inspect catalog, formats, notes |
 
 Exit codes: `0` ok, `1` gate failed, `2` input error.
@@ -249,7 +280,7 @@ app/        FastAPI app, CLI, scanners, connectors, MASVS/CWE mapping,
             threat model, AI briefing and advisor, exporters, web UI
 knowledge/  Curated security notes
 docs/       Research notes (AI pentest landscape)
-tests/      78 tests
+tests/      113 tests
 .claude/    Claude Code skills
 ```
 

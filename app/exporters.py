@@ -14,8 +14,14 @@ SECURITY_SEVERITY = {"critical": "9.5", "high": "8.0", "medium": "5.5", "low": "
 TOOL_NAME = "AAOS Security Auditor"
 
 
-def finding_key(finding: dict[str, Any]) -> tuple[str, str]:
-    """Stable identity used for deduplication and baseline comparison."""
+def finding_key(finding: dict[str, Any], use_fingerprint: bool = True) -> tuple[str, str]:
+    """Identity used for deduplication and baseline comparison.
+
+    The fingerprint survives line shifts; the evidence string is the fallback for reports
+    produced before fingerprints existed.
+    """
+    if use_fingerprint and finding.get("fingerprint"):
+        return str(finding.get("rule_id", "")), str(finding["fingerprint"])
     return str(finding.get("rule_id", "")), str(finding.get("evidence", ""))
 
 
@@ -32,8 +38,12 @@ def filter_by_severity(findings: list[dict[str, Any]], minimum: str) -> list[dic
 
 def compare_with_baseline(report: dict[str, Any], baseline: dict[str, Any]) -> dict[str, Any]:
     """Split findings into new / unchanged / resolved relative to an earlier report."""
-    current = {finding_key(finding): finding for finding in report.get("findings", [])}
-    previous = {finding_key(finding): finding for finding in baseline.get("findings", []) if isinstance(finding, dict)}
+    baseline_findings = [finding for finding in baseline.get("findings", []) if isinstance(finding, dict)]
+    current_findings = report.get("findings", [])
+    # Mixed reports (one side without fingerprints) must fall back to evidence on both sides.
+    use_fingerprint = all(finding.get("fingerprint") for finding in baseline_findings + current_findings)
+    current = {finding_key(finding, use_fingerprint): finding for finding in current_findings}
+    previous = {finding_key(finding, use_fingerprint): finding for finding in baseline_findings}
     new = [finding for key, finding in current.items() if key not in previous]
     resolved = [finding for key, finding in previous.items() if key not in current]
     return {
@@ -52,7 +62,8 @@ def compare_with_baseline(report: dict[str, Any], baseline: dict[str, Any]) -> d
 def to_sarif(report: dict[str, Any], tool_version: str = "0.2.0") -> dict[str, Any]:
     """Emit SARIF 2.1.0 without source snippets; locations are path/line only."""
     catalog = {entry["id"]: entry for entry in rule_catalog()}
-    findings = report.get("findings", [])
+    suppressed = report.get("suppressed_findings", []) or []
+    findings = list(report.get("findings", [])) + list(suppressed)
     rule_ids = sorted({str(finding.get("rule_id", "")) for finding in findings})
     rule_index = {rule_id: index for index, rule_id in enumerate(rule_ids)}
 
@@ -88,6 +99,17 @@ def to_sarif(report: dict[str, Any], tool_version: str = "0.2.0") -> dict[str, A
             "message": {"text": f"{finding.get('title', '')}: {finding.get('summary', '')}".strip(": ")},
             "properties": {"severity": severity, "masvs": finding.get("masvs", []), "cwe": finding.get("cwe", [])},
         }
+        decision = finding.get("suppression")
+        if isinstance(decision, dict):
+            # Recorded team decision: code scanning closes the alert and keeps the justification.
+            result["suppressions"] = [{
+                "kind": "inSource" if decision.get("kind") == "inline" else "external",
+                "status": "accepted",
+                "justification": str(decision.get("reason", ""))[:500],
+            }]
+        if finding.get("fingerprint"):
+            # Stable across line shifts, so code scanning keeps alerts open instead of recreating them.
+            result["partialFingerprints"] = {"aaosFinding/v1": finding["fingerprint"]}
         path = str(finding.get("source_path", ""))
         if path:
             location: dict[str, Any] = {"artifactLocation": {"uri": path}}
@@ -137,8 +159,11 @@ def to_markdown(report: dict[str, Any]) -> str:
         f"- **SHA-256:** `{report.get('source_sha256') or report.get('apk_sha256') or '—'}`",
         f"- **Heuristic level:** {_md(report.get('risk_level', '—'))}",
         "- **Severities:** " + ", ".join(f"{severity} {counts.get(severity, 0)}" for severity in SEVERITY_ORDER),
-        "",
     ]
+    policy = report.get("policy") or {}
+    if policy.get("suppressed"):
+        lines.append(f"- **Suppressed by policy:** {policy['suppressed']} (see below)")
+    lines.append("")
     comparison = report.get("baseline_comparison")
     if comparison:
         lines += [
@@ -171,6 +196,24 @@ def to_markdown(report: dict[str, Any]) -> str:
         lines += ["", "## OWASP MASVS coverage (guidance only)", "", "| Control | Findings | Description |", "|---|---|---|"]
         for control, count in masvs.items():
             lines.append(f"| {control} | {count} | {_md(MASVS_CONTROLS.get(control, ''))} |")
+
+    suppressed = report.get("suppressed_findings") or []
+    if suppressed or policy.get("expired") or policy.get("warnings"):
+        lines += ["", "## Policy decisions", ""]
+        if suppressed:
+            lines += ["| Rule | Where | Kind | Reason | Expires |", "|---|---|---|---|---|"]
+            for item in suppressed:
+                decision = item.get("suppression") or {}
+                lines.append(
+                    f"| `{_md(item.get('rule_id', ''))}` | {_md(item.get('evidence', ''))} | {_md(decision.get('kind', ''))} "
+                    f"| {_md(decision.get('reason', ''))} | {_md(decision.get('expires', '') or '—')} |"
+                )
+        for item in policy.get("expired", []):
+            lines.append(f"- **Expired:** {_md(item.get('suppression', ''))} on {_md(item.get('expired_on', ''))}; the finding is active again.")
+        for item in policy.get("unused", []):
+            lines.append(f"- **Stale:** {_md(item)} matches nothing.")
+        for warning in policy.get("warnings", []):
+            lines.append(f"- **Warning:** {_md(warning)}")
 
     model = report.get("threat_model") or {}
     if model.get("threats"):

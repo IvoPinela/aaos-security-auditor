@@ -16,6 +16,7 @@ python -m app.cli <project-dir> --profile aaos|android_app
     --fail-on none|info|low|medium|high|critical   # exit 1 at/above this severity
     --baseline <old-report.json>   # gate only on findings not in the baseline
     --min-severity <sev>           # hide noise in the output (gate still sees all)
+    --config <aaos.toml> / --no-config   # policy file (auto-discovered at the project root)
     --import <report>              # merge Semgrep/SARIF/Gitleaks/OSV/Trivy/MobSF/Lint results (repeatable)
     --format ai-context            # Markdown briefing for an assistant
 ```

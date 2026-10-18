@@ -10,6 +10,14 @@ from pathlib import PurePosixPath
 from typing import Any
 from xml.etree import ElementTree
 
+from app.car_permissions import (
+    PREFIX as CAR_PERMISSION_PREFIX,
+    SOURCE_NOTE as CAR_PERMISSION_SOURCE_NOTE,
+    classify_car_permissions,
+    is_system_only,
+    is_third_party_grantable,
+    protection_level,
+)
 from app.masvs import enrich_findings, masvs_summary
 
 ANDROID_NS = "http://schemas.android.com/apk/res/android"
@@ -321,8 +329,9 @@ PRIVILEGED_CAR_PERMISSION = re.compile(
 
 
 EGRESS_VEHICLE_DATA = re.compile(
-    r"^android\.car\.permission\.(?:CAR_SPEED|CAR_ENERGY|CAR_ENERGY_PORTS|CAR_INFO|CAR_MILEAGE|CAR_IDENTIFICATION|"
-    r"CAR_EXTERIOR_ENVIRONMENT|CAR_ENGINE_DETAILED|CAR_DYNAMICS_STATE)$"
+    # Personal-data signals only. CAR_INFO, CAR_ENERGY_PORTS and CAR_EXTERIOR_ENVIRONMENT are normal-level
+    # (vehicle model, charge port, outside conditions) and would only add noise.
+    r"^android\.car\.permission\.(?:CAR_SPEED|CAR_ENERGY|CAR_MILEAGE|CAR_IDENTIFICATION|CAR_ENGINE_DETAILED|CAR_DYNAMICS_STATE)$"
 )
 LOCATION_PERMISSIONS = {"android.permission.ACCESS_FINE_LOCATION", "android.permission.ACCESS_COARSE_LOCATION"}
 
@@ -338,7 +347,11 @@ def data_egress_signals(permissions: list[str] | set[str]) -> list[str]:
         return []
     return sorted(
         permission for permission in granted
-        if permission in LOCATION_PERMISSIONS or EGRESS_VEHICLE_DATA.match(permission) or PRIVILEGED_CAR_PERMISSION.match(permission)
+        if permission in LOCATION_PERMISSIONS
+        or EGRESS_VEHICLE_DATA.match(permission)
+        or PRIVILEGED_CAR_PERMISSION.match(permission)
+        # Dangerous android.car permissions can be granted to third-party apps, so they are real data access.
+        or (permission.startswith(CAR_PERMISSION_PREFIX) and protection_level(permission) == "dangerous")
     )
 
 
@@ -360,21 +373,40 @@ def data_egress_finding(signals: list[str], evidence_path: str = "") -> dict[str
 
 
 def privileged_car_permissions(permissions: list[str] | set[str]) -> list[str]:
-    """Return requested AAOS permissions that control or expose sensitive vehicle data."""
-    return sorted(permission for permission in permissions if PRIVILEGED_CAR_PERMISSION.match(permission))
+    """Return requested android.car permissions that only platform-signed or privileged apps are granted.
+
+    The AOSP protection-level table decides; permissions the table does not know (older releases,
+    OEM additions) fall back to the conservative name list.
+    """
+    selected = []
+    for permission in permissions:
+        level = protection_level(permission) if permission.startswith(CAR_PERMISSION_PREFIX) else None
+        if level is not None:
+            if is_system_only(level):
+                selected.append(permission)
+        elif PRIVILEGED_CAR_PERMISSION.match(permission):
+            selected.append(permission)
+    return sorted(selected)
 
 
 def privileged_car_permission_finding(permissions: list[str], evidence_path: str = "") -> dict[str, str]:
     """Build one finding summarizing privileged vehicle permissions for both APK and source scans."""
-    listed = ", ".join(permission.rsplit(".", 1)[-1] for permission in permissions[:8])
+    def label(permission: str) -> str:
+        return f"{permission.rsplit('.', 1)[-1]} [{protection_level(permission) or 'unverified'}]"
+
+    listed = ", ".join(label(permission) for permission in permissions[:8])
     if len(permissions) > 8:
         listed += f" (+{len(permissions) - 8})"
     return {
         "rule_id": "AAOS-PRIVILEGED-CAR-PERMISSION",
         "title": "Sensitive vehicle permissions requested",
         "severity": "medium",
-        "summary": f"The manifest requests {len(permissions)} android.car permission(s) for control or detailed telemetry: {listed}. Many are signature/privileged and are granted only to system/OEM apps.",
-        "recommendation": "Confirm the functional need for each permission, the protection level on the target AAOS build, and that control operations validate the vehicle state.",
+        "summary": (
+            f"The manifest requests {len(permissions)} android.car permission(s) that only platform-signed or privileged apps are granted: {listed}. "
+            "A normal third-party app is not granted them, so this matters when the app is, or will ship as, a system/OEM app. "
+            f"Levels come from {CAR_PERMISSION_SOURCE_NOTE}."
+        ),
+        "recommendation": "Confirm whether the app ships as a privileged system app, the protection level on your target AAOS build, the OEM privapp-permissions allow-list, and that control operations validate the vehicle state.",
         "evidence": evidence_path or "uses-permission android.car.permission.*",
         "source_path": evidence_path,
         "line": "1" if evidence_path else "",
@@ -397,6 +429,7 @@ def _finding(rule: dict[str, Any], path: str, line_number: int, line: str) -> di
         "source_path": path,
         "line": str(line_number),
         "profile": rule["profile"],
+        "_anchor": line,  # hashed into the fingerprint, then removed; never reported
     }
 
 
@@ -918,6 +951,7 @@ def analyze_source_directory(files: dict[str, bytes], profile: str = "aaos") -> 
         "source_file_count": len(normalized),
         "source_bytes": sum(len(data) for data in normalized.values()),
         "source_sha256": digest.hexdigest(),
+        "car_permissions": classify_car_permissions(manifest_permissions),
         "profiles_run": profiles,
         "severity_counts": severity_counts,
         "risk_level": risk_level,

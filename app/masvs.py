@@ -8,6 +8,8 @@ from __future__ import annotations
 from fnmatch import fnmatchcase
 from typing import Any
 
+from app.fingerprints import assign_fingerprints
+
 MASVS_VERSION = "2.1"
 
 MASVS_CONTROLS: dict[str, str] = {
@@ -169,6 +171,7 @@ def enrich_findings(findings: list[dict[str, Any]]) -> list[dict[str, Any]]:
         rule_id = str(finding.get("rule_id", ""))
         finding.setdefault("cwe", cwe_for_rule(rule_id))
         finding.setdefault("masvs", masvs_for_rule(rule_id) or masvs_for_cwe(list(finding.get("cwe") or [])))
+    assign_fingerprints(findings)
     return findings
 
 
