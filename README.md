@@ -11,7 +11,7 @@ Find what matters in an in-vehicle app **before it reaches the road**: reproduci
 ![Rules](https://img.shields.io/badge/rules-54-orange)
 ![Standards](https://img.shields.io/badge/OWASP%20MASVS-v2-red)
 ![Output](https://img.shields.io/badge/SARIF-2.1.0-purple)
-![Tests](https://img.shields.io/badge/tests-113%20passing-brightgreen)
+[![CI](https://github.com/IvoPinela/aaos-security-auditor/actions/workflows/ci.yml/badge.svg)](https://github.com/IvoPinela/aaos-security-auditor/actions/workflows/ci.yml)
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Status](https://img.shields.io/badge/status-MVP%20%C2%B7%20pentest%20workflow%20evolving-yellow)
 
@@ -291,9 +291,14 @@ tests/      113 tests
 ## Development
 
 ```bash
-pip install pytest
-pytest
+pip install -r requirements-dev.txt
+pytest                              # unit and API tests (browser tests are skipped without Playwright)
+
+playwright install chromium         # once, for the browser tests
+pytest tests/ui                     # drives the real web UI; set UI_BROWSER_CHANNEL=msedge or chrome to reuse an installed browser
 ```
+
+GitHub Actions runs everything on every push and pull request: the test suite on Python 3.11 to 3.13 (plus Windows), the browser tests in Chromium, and a self-scan that checks SARIF output, fingerprints and the `--fail-on` gate. Dependabot keeps dependencies and workflow actions current.
 
 The suite fails if a rule has no MASVS mapping or no knowledge note, so new rules cannot ship half-wired.
 

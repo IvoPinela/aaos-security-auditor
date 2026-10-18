@@ -1,0 +1,103 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Tests (Python ${{ matrix.python }}, ${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest]
+        python: ["3.11", "3.12", "3.13"]
+        include:
+          - os: windows-latest
+            python: "3.13"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+          cache: pip
+          cache-dependency-path: requirements*.txt
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt pytest
+      - name: Unit and API tests
+        run: python -m pytest -q
+      - name: Knowledge base is valid
+        run: python -m app.cli --check-knowledge
+      - name: Rule catalog loads
+        run: python -m app.cli --list-rules
+
+  ui:
+    name: Browser tests (Chromium)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements*.txt
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+      - name: Install Chromium
+        run: playwright install --with-deps chromium
+      - name: UI tests
+        run: python -m pytest tests/ui -q
+      - name: Upload screenshots on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-test-output
+          path: test-results/
+          if-no-files-found: ignore
+
+  self-scan:
+    name: Self-scan (the auditor audits its own fixture)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements*.txt
+      - run: pip install -r requirements.txt
+      - name: Scan the fixture project and produce SARIF
+        # --fail-on none: this step only produces the report; the gate is checked in its own step below.
+        run: python -m app.cli tests/ui/fixtures/Climate --profile aaos --format sarif --fail-on none -o self-scan.sarif
+      - name: SARIF is valid and carries fingerprints
+        run: |
+          python - <<'EOF'
+          import json
+          sarif = json.load(open("self-scan.sarif", encoding="utf-8"))
+          results = sarif["runs"][0]["results"]
+          assert sarif["version"] == "2.1.0" and results, "no results"
+          assert all(r.get("partialFingerprints") for r in results), "missing fingerprints"
+          print(f"{len(results)} results, all fingerprinted")
+          EOF
+      - name: Gate trips on high findings (fail-on high must exit 1)
+        run: |
+          set +e
+          python -m app.cli tests/ui/fixtures/Climate --profile aaos --no-config --fail-on high > /dev/null
+          code=$?
+          test "$code" -eq 1 || { echo "expected exit code 1, got $code"; exit 1; }

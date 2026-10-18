@@ -1,0 +1,19 @@
+[settings]
+fail_on = "high"
+disabled_rules = ["ANDROID-HTTP-URL"]
+
+[[suppress]]
+rule = "ANDROID-WEAK-HASH"
+path = "app/src/main/java/com/oem/climate/ImageCache.kt"
+reason = "MD5 is only used to build cache keys, never for security"
+author = "ivo"
+expires = 2099-12-31
+
+[[suppress]]
+rule = "ANDROID-WEBVIEW-JS"
+reason = "temporary exception during the WebView migration"
+expires = 2026-01-31
+
+[[suppress]]
+rule = "ANDROID-PREFS-SENSITIVE"
+reason = "this entry matches nothing and should be flagged as stale"
