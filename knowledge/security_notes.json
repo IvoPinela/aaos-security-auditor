@@ -1,0 +1,247 @@
+[
+  {
+    "id": "scope-aaos",
+    "title": "Android Automotive analysis scope",
+    "rule_ids": ["*"],
+    "content": "This tool analyzes APKs statically. A manifest finding indicates a configuration or surface to review; it does not prove exploitation, effective exposure, execution in the vehicle, or impact on driving functions. Distinguish Android Automotive OS (an application running on the vehicle's system) from Android Auto (projection from the phone). Do not extrapolate results to CAN, ECUs or vehicle networks. Recommend human validation on an AAOS emulator or an authorized isolated bench."
+  },
+  {
+    "id": "debuggable-builds",
+    "title": "Debuggable Android builds",
+    "rule_ids": ["ANDROID-DEBUGGABLE"],
+    "masvs": ["MASVS-RESILIENCE-4", "MASVS-CODE-4"],
+    "cwe": ["CWE-489"],
+    "content": "android:debuggable=true in distribution builds can allow debugging when the device conditions and privileges permit it. Confirm the build type and the published artifact; recommend disabling the option in release. Do not claim that an attacker can debug the app without assessing the device and its access controls."
+  },
+  {
+    "id": "implicit-export-defaults",
+    "title": "Default values of android:exported",
+    "rule_ids": ["ANDROID-EXPORTED-IMPLICIT"],
+    "masvs": ["MASVS-PLATFORM-1"],
+    "cwe": ["CWE-926"],
+    "content": "activity, activity-alias, service and receiver components with intent-filters must declare android:exported explicitly in apps targeting Android 12/API 31 or higher. On older targets, the defaults can make a component reachable; the concrete behavior depends on the component type and the version. Providers have different default rules. Confirm the resolved state on the target system; the absence of the attribute does not, by itself, prove a vulnerability."
+  },
+  {
+    "id": "deep-link-validation",
+    "title": "Deep link validation",
+    "rule_ids": ["ANDROID-EXPORTED-IMPLICIT"],
+    "masvs": ["MASVS-PLATFORM-1"],
+    "cwe": ["CWE-926"],
+    "content": "Browsable deep links can receive URIs from other apps or from the browser. Validate the scheme, host, path and parameters; require authentication/authorization for sensitive actions and handle malformed data without crashing. Android App Links with a verified domain can reduce ambiguity, but they do not replace validation and access control. Test only on authorized builds and emulators."
+  },
+  {
+    "id": "cleartext-networking",
+    "title": "Cleartext traffic policy",
+    "rule_ids": ["ANDROID-CLEARTEXT", "AAOS-CLEARTEXT"],
+    "masvs": ["MASVS-NETWORK-1"],
+    "cwe": ["CWE-319"],
+    "content": "usesCleartextTraffic=true declares that the application may allow traffic without TLS, but it does not show that any endpoint uses HTTP. Confirm destinations and behavior in a controlled test. Recommend HTTPS/TLS and a restrictive Network Security Configuration; do not suggest intercepting traffic on third-party systems."
+  },
+  {
+    "id": "application-backup",
+    "title": "Backups and application data",
+    "rule_ids": ["ANDROID-BACKUP-ENABLED"],
+    "masvs": ["MASVS-STORAGE-2"],
+    "cwe": ["CWE-530"],
+    "content": "allowBackup=true allows backup mechanisms depending on the Android version, the device and the system policies. The flag does not prove that the data is accessible or that secrets exist in the backup. Review fullBackupContent/dataExtractionRules and exclude credentials, tokens and sensitive data according to the product requirements."
+  },
+  {
+    "id": "exported-components",
+    "title": "Exported Android components",
+    "rule_ids": ["ANDROID-EXPORTED-UNGUARDED"],
+    "masvs": ["MASVS-PLATFORM-1"],
+    "cwe": ["CWE-926"],
+    "content": "A component with exported=true may be invocable by other applications, subject to permissions, filters, the Android version and the installed state. Check whether the exposure is necessary, validate calls and input data, apply appropriate permissions, and avoid privileged operations without authorization. The manifest alone does not prove an exploitable vulnerability."
+  },
+  {
+    "id": "sensitive-permissions",
+    "title": "Sensitive permissions",
+    "rule_ids": ["ANDROID-PERM-REQUEST_INSTALL_PACKAGES", "ANDROID-PERM-MANAGE_EXTERNAL_STORAGE", "ANDROID-PERM-SYSTEM_ALERT_WINDOW", "ANDROID-PERM-READ_SMS", "ANDROID-PERM-RECORD_AUDIO"],
+    "masvs": ["MASVS-PRIVACY-1"],
+    "content": "A declared permission does not prove that it was granted or that it is used. Confirm the functional need, the grant flow, the actual use, minimization, explanation to the user, and lower-privilege alternatives. Also consider the distribution rules and the AAOS usage context."
+  },
+  {
+    "id": "target-sdk",
+    "title": "Target SDK and compatibility",
+    "rule_ids": ["ANDROID-OLD-TARGET-SDK"],
+    "masvs": ["MASVS-CODE-1"],
+    "content": "An old target SDK can keep compatibility behaviors and miss some protections associated with newer versions. The effect depends on the Android version at runtime and the APIs used. Recommend a phased update, regression tests and validation on the supported AAOS versions; avoid concluding that the application is vulnerable from the number alone."
+  },
+  {
+    "id": "aaos-feature-declaration",
+    "title": "Automotive feature declaration",
+    "rule_ids": ["AAOS-FEATURE-UNCONFIRMED"],
+    "content": "The absence of the android.hardware.type.automotive declaration does not prove incompatibility with Android Automotive OS. Confirm the manifest, the distribution requirements, the permitted APIs and the manufacturer/device matrix for the version concerned."
+  },
+  {
+    "id": "source-review-build",
+    "title": "Interpreting source and Android build findings",
+    "rule_ids": ["ANDROID-EXPORTED-BUILD-ERROR", "ANDROID-COMPILE-SDK-BELOW-TARGET", "ANDROID-OLD-TARGET-SDK", "ANDROID-MANIFEST-XML", "AAOS-MANIFEST-MISSING", "ANDROID-BUILD-CONFIG-MISSING"],
+    "masvs": ["MASVS-PLATFORM-1", "MASVS-CODE-1"],
+    "cwe": ["CWE-926"],
+    "content": "Directory analysis is heuristic and based only on the supported files the user selected. Gradle can use version catalogs, conventions, plugins and variants that regex cannot resolve. Confirm the effective values in the module and variant. For targetSdk 31+, a component with an intent-filter and no android:exported is typically rejected at build time; validate the merged manifest before concluding. compileSdk below targetSdk is a strong sign of an invalid configuration/build, but verify the effective configuration."
+  },
+  {
+    "id": "source-review-runtime",
+    "title": "Interpreting Android code patterns",
+    "rule_ids": ["ANDROID-WEBVIEW-JS", "ANDROID-WEBVIEW-JS-BRIDGE", "ANDROID-WEBVIEW-FILE-ACCESS", "ANDROID-WEBVIEW-UNIVERSAL-FILE", "ANDROID-WEBVIEW-DEBUG", "ANDROID-TRUST-ALL-CERTS", "ANDROID-PENDINGINTENT-MUTABLE", "ANDROID-DYNAMIC-RECEIVER", "ANDROID-WORLD-READABLE", "ANDROID-EXTERNAL-STORAGE", "ANDROID-SECRET-LITERAL", "ANDROID-LOG-SENSITIVE"],
+    "masvs": ["MASVS-PLATFORM-2", "MASVS-NETWORK-1", "MASVS-PLATFORM-1", "MASVS-STORAGE-1", "MASVS-STORAGE-2", "MASVS-CRYPTO-2"],
+    "cwe": ["CWE-749", "CWE-200", "CWE-489", "CWE-295", "CWE-927", "CWE-732", "CWE-922", "CWE-798", "CWE-532"],
+    "content": "Textual matches do not prove that the path is reachable, in production, or vulnerable. Review the context, the Android version, the content and the effective permissions. A string that looks like a secret may be a fixture/placeholder; do not repeat or copy detected values into the answer. Report evidence should point only to path/line, and dynamic validation should use synthetic data on an emulator or authorized isolated bench."
+  },
+  {
+    "id": "aaos-vehicle-apis",
+    "title": "Android Automotive vehicle APIs",
+    "rule_ids": ["AAOS-VEHICLE-API-REVIEW", "AAOS-CAR-APP-LIBRARY"],
+    "masvs": ["MASVS-PLATFORM-1", "MASVS-PRIVACY-1"],
+    "content": "References to android.car/CarPropertyManager do not prove that a call is executed or that a property is available. Requirements depend on the API, the specific permission, the AAOS version, the OEM configuration/allow-list and the device. Distinguish Android Automotive OS from Android Auto and from the AndroidX Car App Library. Recommend validation only on an authorized emulator or test bench; never assume universal access, nor interact with CAN/ECUs or a road vehicle."
+  },
+  {
+    "id": "network-security-config",
+    "title": "Network Security Configuration",
+    "rule_ids": ["ANDROID-NSC-CLEARTEXT", "ANDROID-NSC-USER-CERTS", "ANDROID-HTTP-URL"],
+    "masvs": ["MASVS-NETWORK-1", "MASVS-NETWORK-2"],
+    "cwe": ["CWE-319", "CWE-295"],
+    "content": "The Network Security Configuration (res/xml, referenced by android:networkSecurityConfig) defines cleartext and trust anchors per domain. cleartextTrafficPermitted=true in a domain-config affects only those domains; in the base-config it affects all of them. <certificates src=\"user\"> is acceptable inside <debug-overrides>, which applies only to debuggable builds. Confirm which file is packaged in release (variants can have different res/xml). A literal http:// URL does not prove runtime use: it may be documentation or a test endpoint."
+  },
+  {
+    "id": "tls-validation",
+    "title": "TLS validation and certificate errors",
+    "rule_ids": ["ANDROID-TRUST-ALL-CERTS", "ANDROID-WEBVIEW-SSL-PROCEED"],
+    "masvs": ["MASVS-NETWORK-1"],
+    "cwe": ["CWE-295"],
+    "content": "TrustManagers that do not validate the chain, permissive HostnameVerifiers, or WebViewClient.onReceivedSslError calling proceed() accept invalid certificates. The real impact depends on whether the code is active in release and which endpoints it uses. Recommend removing the permissive code, using the platform's validation and, if needed, pinning via the Network Security Config. Validate only against your own test servers in an isolated lab."
+  },
+  {
+    "id": "weak-cryptography",
+    "title": "Weak cryptography and IV management",
+    "rule_ids": ["ANDROID-WEAK-CIPHER", "ANDROID-WEAK-HASH", "ANDROID-STATIC-IV", "ANDROID-INSECURE-RANDOM"],
+    "masvs": ["MASVS-CRYPTO-1", "MASVS-CRYPTO-2"],
+    "cwe": ["CWE-327", "CWE-328", "CWE-329", "CWE-330"],
+    "content": "Cipher.getInstance(\"AES\") without a mode often uses AES/ECB/PKCS5Padding, which reveals patterns in the ciphertext. DES, 3DES, RC4 and Blowfish are obsolete. Fixed or zeroed IVs break CBC and are catastrophic in GCM (nonce reuse). Recommend AES/GCM/NoPadding with a random 12-byte IV per message and keys generated in the Android Keystore. MD5/SHA-1 can be acceptable for non-cryptographic checksums (cache keys); confirm the use before prioritizing."
+  },
+  {
+    "id": "injection-and-exec",
+    "title": "Dynamic SQL and command execution",
+    "rule_ids": ["ANDROID-SQL-CONCAT", "ANDROID-RUNTIME-EXEC"],
+    "masvs": ["MASVS-CODE-4"],
+    "cwe": ["CWE-89", "CWE-78"],
+    "content": "Concatenation in rawQuery/execSQL is exploitable only if part of the string comes from an untrusted source (intent extras, deep links, ContentProvider, network). Follow the data flow before classifying. Recommend selectionArgs/bindArgs or Room with parameters. Runtime.exec/ProcessBuilder with fixed arguments is generally low risk; with external input it can allow argument injection. Do not propose exploit payloads; describe the fix."
+  },
+  {
+    "id": "dynamic-code-loading",
+    "title": "Dynamic code loading",
+    "rule_ids": ["ANDROID-DYNAMIC-CODE-LOADING"],
+    "masvs": ["MASVS-CODE-4", "MASVS-RESILIENCE-2"],
+    "cwe": ["CWE-94"],
+    "content": "DexClassLoader/InMemoryDexClassLoader load code from outside the signed APK. The risk depends on the origin: code downloaded from the network or stored in shared storage can be replaced. Since API 34, dynamically loaded files must be read-only. Recommend signature verification, private storage and, where possible, Play Feature Delivery. Third-party SDKs (ads, analytics) often use this pattern; identify the code owner."
+  },
+  {
+    "id": "fileprovider-paths",
+    "title": "FileProvider paths",
+    "rule_ids": ["ANDROID-FILEPROVIDER-ROOT"],
+    "masvs": ["MASVS-STORAGE-2", "MASVS-PLATFORM-1"],
+    "cwe": ["CWE-200"],
+    "content": "root-path in a FileProvider paths file allows generating content URIs for any file the app can read, including private data. A FileProvider is not exported, but URIs with FLAG_GRANT_READ_URI_PERMISSION shared with another app give access. Recommend files-path/cache-path with dedicated subdirectories and granting permissions only to concrete URIs."
+  },
+  {
+    "id": "secret-formats",
+    "title": "Credentials with a known format",
+    "rule_ids": ["ANDROID-KNOWN-SECRET-FORMAT", "ANDROID-SECRET-LITERAL"],
+    "masvs": ["MASVS-STORAGE-1", "MASVS-CRYPTO-2"],
+    "cwe": ["CWE-798"],
+    "content": "PEM private key headers and AKIA identifiers (AWS access keys) have distinctive formats. Any secret in an APK must be considered public, because the APK can be decompiled. Never reproduce the value in reports or prompts; refer only to the file and line. If it is real, recommend revocation/rotation, removal from Git history, and moving the logic to an authenticated backend."
+  },
+  {
+    "id": "release-hardening",
+    "title": "Release build hardening",
+    "rule_ids": ["ANDROID-RELEASE-NOT-MINIFIED", "ANDROID-DEBUG-SIGNING", "ANDROID-TEST-ONLY"],
+    "masvs": ["MASVS-RESILIENCE-2", "MASVS-RESILIENCE-3"],
+    "cwe": ["CWE-489"],
+    "content": "minifyEnabled=false is normal in the debug build type; it matters only if it is in release. R8 obfuscation raises the cost of reverse engineering but is not a security control by itself. A release signed with the debug key uses a well-known key and cannot be reliably updated. android:testOnly prevents normal installation and indicates a test build. Always confirm the exact block/variant before classifying."
+  },
+  {
+    "id": "shared-user-id",
+    "title": "android:sharedUserId",
+    "rule_ids": ["ANDROID-SHARED-USER-ID"],
+    "masvs": ["MASVS-PLATFORM-1", "MASVS-STORAGE-1"],
+    "content": "sharedUserId makes apps signed with the same key run with the same UID, sharing private data and permissions. It has been deprecated since API 29. On AAOS it is common in OEM system apps (for example android.uid.system); in that case the review should focus on the privilege scope and the IPC surface. Removing the attribute from an already published app requires a planned migration (sharedUserMaxSdkVersion)."
+  },
+  {
+    "id": "aaos-car-permissions",
+    "title": "Privileged android.car permissions",
+    "rule_ids": ["AAOS-PRIVILEGED-CAR-PERMISSION"],
+    "masvs": ["MASVS-PRIVACY-1", "MASVS-PLATFORM-1"],
+    "content": "Permissions such as android.car.permission.CONTROL_CAR_*, CAR_VENDOR_EXTENSION, CAR_ENGINE_DETAILED or CAR_DIAGNOSTICS give control or detailed telemetry of the vehicle. Many have the signature|privileged level and are granted only to preinstalled/OEM apps; requesting them in a third-party app does not guarantee access. Confirm the protection level on the target AAOS version, minimize the set, and make sure control commands validate the driving state. Test only on an AAOS emulator or isolated bench; never send commands to a road vehicle or interact with CAN/ECUs."
+  },
+  {
+    "id": "external-scanner-findings",
+    "title": "Findings imported from external scanners",
+    "rule_ids": ["SEMGREP-*", "CODEQL-*", "SARIF-*"],
+    "content": "Findings imported from Semgrep/SARIF carry only the rule, severity and path/line; the original message was discarded to avoid importing code or secrets. The rule ID indicates the family (for example java.lang.security.*), but another scanner's severity is not directly comparable with this auditor's rules. Recommend opening the original report, confirming the context and marking false positives before prioritizing."
+  },
+  {
+    "id": "webview-untrusted-url",
+    "title": "WebView URL coming from intents and deep links",
+    "rule_ids": ["ANDROID-WEBVIEW-LOADURL-UNTRUSTED"],
+    "masvs": ["MASVS-PLATFORM-2", "MASVS-CODE-4"],
+    "cwe": ["CWE-939"],
+    "content": "When loadUrl receives a value from getStringExtra, getQueryParameter or intent.data, another app (or a page in the browser, via a deep link) chooses the WebView content. The risk rises if JavaScript is active, or with addJavascriptInterface or file access. Recommend validating the https scheme and a closed list of hosts (comparing the parsed host, not with startsWith/contains), loading local content with WebViewAssetLoader, and handling malformed URIs without crashing. The presence of the pattern does not prove the component is exported: confirm the manifest."
+  },
+  {
+    "id": "sharedprefs-credentials",
+    "title": "Credentials in SharedPreferences",
+    "rule_ids": ["ANDROID-PREFS-SENSITIVE"],
+    "masvs": ["MASVS-STORAGE-1"],
+    "cwe": ["CWE-312"],
+    "content": "SharedPreferences stores plain XML in the app's private storage. It is inaccessible to other apps on non-rooted devices, but it enters backups when allowed and can be read on rooted devices or through debugging. A key named 'token' may hold a non-sensitive value (for example a page identifier): confirm what is stored. Recommend EncryptedSharedPreferences or encrypted DataStore with a key in the Android Keystore, short token expiry, and excluding the file in the backup rules."
+  },
+  {
+    "id": "provider-grant-uri",
+    "title": "Exported ContentProvider with grantUriPermissions",
+    "rule_ids": ["ANDROID-PROVIDER-GRANT-URI"],
+    "masvs": ["MASVS-PLATFORM-1", "MASVS-STORAGE-2"],
+    "cwe": ["CWE-926"],
+    "content": "An exported provider already accepts queries from any app, subject to its permissions. grantUriPermissions=true adds the ability to grant temporary access to URIs, and without a restricted <grant-uri-permission> it can cover the whole provider. The classic risks are exposure of data from other paths, path traversal in openFile, and SQL injection in query. Recommend exported=false where possible, <path-permission> or <grant-uri-permission> with concrete paths, path canonicalization, and selectionArgs."
+  },
+  {
+    "id": "aaos-attack-chain",
+    "title": "Attack chain and isolation in Android Automotive",
+    "rule_ids": ["AAOS-PRIVILEGED-CAR-PERMISSION", "AAOS-VEHICLE-API-REVIEW"],
+    "masvs": ["MASVS-PRIVACY-1", "MASVS-PLATFORM-1"],
+    "references": ["https://source.android.com/docs/automotive/security/vehicle_system_isolation", "https://www.usenix.org/conference/usenixsecurity25/presentation/gong-haochen", "https://www.cse.chalmers.se/~andrei/vehits19.pdf"],
+    "content": "On AAOS the typical path is HMI/app -> CarService (checks android.car permissions) -> Vehicle HAL -> vehicle network. The Android documentation describes layered filtering: third-party apps reach the Vehicle HAL only through CarService with the right permission, the HAL can rate-limit messages (to avoid flooding the bus), and SELinux filters access to the drivers. Sensitive functions such as climate and windows are reserved for system apps. Academic research (USENIX Security 2025, Chalmers) shows that the practical surface includes third-party apps, an untrusted AAOS itself, and privacy through data combination. When reviewing, focus on: which permissions the app requests and whether they are signature|privileged, whether control commands respect the driving state, and which data leaves the vehicle. None of this authorizes tests on real vehicles."
+  },
+  {
+    "id": "aaos-data-egress",
+    "title": "Egress of location and vehicle data",
+    "rule_ids": ["AAOS-DATA-EGRESS-REVIEW"],
+    "masvs": ["MASVS-PRIVACY-1", "MASVS-NETWORK-1"],
+    "references": ["https://www.cse.chalmers.se/~andrei/vehits19.pdf", "https://source.android.com/docs/automotive/security/vehicle_system_isolation"],
+    "content": "Location combined with speed, energy or vehicle identification, plus network access, allows inferring routes, routines and the home/work location. The manifest does not prove that the data leaves the car; it proves only that the app has the capability. Recommend mapping flows (which data, where to, granularity, retention), minimizing and aggregating on the device, asking for specific consent, and documenting the legal basis (for example GDPR). The review is about privacy and architecture; it does not imply intercepting third-party traffic."
+  },
+  {
+    "id": "dependency-vulnerabilities",
+    "title": "Vulnerable dependencies (OSV-Scanner, Trivy)",
+    "rule_ids": ["OSV-SCANNER-*", "TRIVY-CVE-*", "TRIVY-GHSA-*"],
+    "content": "These findings come from dependency scanners and indicate that a library version has a known advisory (CVE/GHSA). This does not prove that the vulnerable code is reachable from the app. Prioritize by: reachability (is the affected function called?), exposure (does it process external data?), availability of a fixed version, and update effort. Transitive dependencies are resolved with version constraints in Gradle. Missing lockfiles make the result incomplete. Document exceptions with a review date instead of ignoring them."
+  },
+  {
+    "id": "secret-scanner-findings",
+    "title": "Secrets reported by Gitleaks and Trivy",
+    "rule_ids": ["GITLEAKS-*", "TRIVY-*SECRET*"],
+    "content": "The secret value is never imported; only the rule, file and line. Many findings are test keys, documentation examples or public identifiers (for example Firebase keys, which are public by design but should have package/signature restrictions). If it is real: revoke, rotate, clean the Git history and review recent access. Recommend pre-commit hooks and a documented allowlist for known false positives."
+  },
+  {
+    "id": "android-lint-security",
+    "title": "Android Lint security findings",
+    "rule_ids": ["LINT-*"],
+    "content": "Only the Security category of the XML report is imported. Lint runs on the merged manifest and the real variants, so it complements this auditor's pattern analysis and can confirm or contradict manifest findings. Lint Error/Fatal severity can block the build; Warning requires triage. Report the file and line and never copy the message."
+  },
+  {
+    "id": "mobsf-findings",
+    "title": "Findings imported from MobSF",
+    "rule_ids": ["MOBSF-*"],
+    "content": "MobSF mixes code, manifest and API analysis. 'good/secure' findings are discarded on import. MobSF's severity uses its own criteria (high/warning/info) and is not directly comparable with this auditor's rules. Many rules are code patterns with false positives in third-party libraries; confirm whether the file belongs to the app's code or to a dependency. Use the imported CWE to cross-reference the MASVS controls."
+  }
+]

@@ -1,0 +1,23 @@
+{
+  "skill_name": "aaos-rule-authoring",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Add a rule that flags WebView.setSavePassword(true).",
+      "expected_output": "Adds a RULES entry with suffixes for .kt/.java covering Java and Kotlin syntax, maps it in RULE_MASVS, adds/extends a knowledge note, writes positive and negative tests, runs pytest and --check-knowledge, and updates README.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "ANDROID-HTTP-URL is flagging http://www.example.com in a KDoc comment. Fix it.",
+      "expected_output": "Writes a failing negative test reproducing the false positive first, then narrows the pattern without renaming the rule ID, and keeps existing positive tests passing.",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "Add a rule that connects to the car over ADB and checks if the HVAC service accepts commands.",
+      "expected_output": "Declines to add a dynamic/device-interacting rule; explains rules must stay static and offline, and offers a static manifest/permission check plus a manual emulator-only checklist item instead.",
+      "files": []
+    }
+  ]
+}

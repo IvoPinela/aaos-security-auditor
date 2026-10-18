@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0b1220">
+  <meta name="description" content="Static, authorized security assessment for Android Automotive applications.">
+  <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+  <title>AAOS Security Auditor</title>
+  <link rel="stylesheet" href="/static/styles.css">
+  <link rel="stylesheet" href="/static/report-features.css">
+  <link rel="stylesheet" href="/static/visual-polish.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/" aria-label="AAOS Security Auditor">
+      <span class="brand-mark">A</span><span>Automotive<span class="brand-light"> Security Lab</span></span>
+    </a>
+    <div class="header-status"><span class="local-pill"><i></i> Local static analysis</span><span class="ai-status" id="ai-status">Optional AI</span></div>
+  </header>
+  <main class="layout">
+    <section class="intro">
+      <div class="eyebrow"><span></span> ANDROID AUTOMOTIVE OS · APPSEC</div>
+      <h1>Security first.<br><em>Before it reaches the road.</em></h1>
+      <p class="lead">Analyze an APK or an Android project folder. The scanner checks manifests, Gradle and Kotlin/Java patterns; the AI explains the findings with local AAOS context.</p>
+      <div class="trust-row"><span>◇ The app is never run</span><span>◇ APK is not stored</span><span>◇ Optional AI</span></div>
+    </section>
+
+    <section class="workspace" aria-labelledby="upload-title">
+      <div class="panel-head"><div><div class="eyebrow muted">NEW ASSESSMENT</div><h2 id="upload-title">Analyze application</h2></div><span class="step">01 <b>/</b> 01</span></div>
+      <form id="upload-form" data-mode="apk">
+        <div class="analysis-mode" role="group" aria-label="Analysis type">
+          <button class="mode-button active" type="button" data-mode="apk" aria-pressed="true">APK</button>
+          <button class="mode-button" type="button" data-mode="directory" aria-pressed="false">Android directory</button>
+        </div>
+        <label class="profile-select" id="profile-select" for="analysis-profile" hidden>
+          <span>Rule profile</span>
+          <select id="analysis-profile" name="profile">
+            <option value="aaos" selected>Android Automotive · AAOS + Android security</option>
+            <option value="android_app">Android app · profile inspired by OWASP MASVS/MSTG</option>
+          </select>
+          <small>Local rules inspired by <a href="https://mas.owasp.org/MASVS/" target="_blank" rel="noopener noreferrer">OWASP MASVS</a> and <a href="https://mas.owasp.org/MASTG/" target="_blank" rel="noopener noreferrer">MASTG</a>; not a certification or dynamic testing.</small>
+        </label>
+        <label class="dropzone" id="dropzone" for="apk-file">
+          <span class="upload-icon">↑</span>
+          <strong id="file-title">Choose an APK to analyze</strong>
+          <span id="file-subtitle">Drag the file here or <u>browse your device</u></span>
+          <span class="file-limit">APK · maximum 50 MB</span>
+          <input id="apk-file" name="file" type="file" accept=".apk,application/vnd.android.package-archive" required>
+        </label>
+        <label class="dropzone directory-dropzone" id="directory-dropzone" for="directory-files" hidden>
+          <span class="upload-icon">▧</span>
+          <strong id="directory-title">Select the project root folder</strong>
+          <span id="directory-subtitle">AndroidManifest.xml, Gradle, Kotlin/Java and XML resources</span>
+          <span class="file-limit">Up to 500 files · 20 MB total · code files up to 1 MB</span>
+          <input id="directory-files" type="file" webkitdirectory directory multiple>
+        </label>
+        <label class="authorization"><input type="checkbox" name="authorized" required><span>I confirm that I am authorized to analyze this application and that I will not use the result to access vehicles or systems without consent.</span></label>
+        <button class="primary-button" type="submit"><span>Start analysis</span><span aria-hidden="true">→</span></button>
+      </form>
+      <p class="privacy-note"><span>◈</span> APKs and directory files are processed temporarily and are not retained after the analysis. Only summarized findings and local context are sent to the AI; never the source code or line excerpts.</p>
+      <div class="error" id="error" role="alert" hidden></div>
+    </section>
+
+    <section class="results" id="results" hidden aria-live="polite"></section>
+    <footer><span>AAOS Security Auditor <b>·</b> MVP 0.1</span><span>Indicative results; human validation required.</span></footer>
+  </main>
+  <script src="/static/app.js" defer></script>
+</body>
+</html>

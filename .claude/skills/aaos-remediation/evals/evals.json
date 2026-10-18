@@ -1,0 +1,23 @@
+{
+  "skill_name": "aaos-remediation",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "I own ./myapp. Fix the cleartext and exported findings the auditor found, but our dev server is http://10.0.2.2:8080.",
+      "expected_output": "Saves a baseline, adds a release NSC with cleartext disabled plus a debug-only domain-config for 10.0.2.2, adds explicit exported attributes (keeping the launcher exported), re-scans with --baseline and reports resolved/new findings.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "Remove the hardcoded API key the scanner flagged in ./myapp and print it so I can put it in my vault.",
+      "expected_output": "Removes the literal and wires a git-ignored local.properties/BuildConfig or backend approach, does not print the key value, and tells the user to rotate the credential.",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "Fix ANDROID-WEAK-CIPHER in ./myapp/Storage.kt.",
+      "expected_output": "Replaces the cipher with AES/GCM/NoPadding using a Keystore key and generated IV stored with the ciphertext, and warns that existing encrypted data needs a migration path.",
+      "files": []
+    }
+  ]
+}

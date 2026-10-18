@@ -1,0 +1,17 @@
+{
+  "skill_name": "aaos-ci-gate",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Add the auditor to GitHub Actions for my AAOS repo (app is in ./automotive). Fail PRs on high findings and show results in code scanning.",
+      "expected_output": "Writes a workflow that pins the auditor to a commit, runs the CLI with --format sarif and uploads it with minimal permissions, gates with --fail-on high, and suggests a committed baseline. Does not push or trigger a run.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "Our legacy app has 120 findings. If I add --fail-on medium every PR will fail. What do I do?",
+      "expected_output": "Recommends generating and committing a baseline on main and gating PRs on --baseline so only new findings fail, explaining the baseline should shrink over time.",
+      "files": []
+    }
+  ]
+}
