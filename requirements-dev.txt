@@ -1,4 +1,4 @@
 -r requirements.txt
 pytest>=8.0,<10
 # Browser tests in tests/ui (skipped automatically when Playwright is not installed).
-playwright>=1.45,<2
+playwright>=1.64.0,<2
