@@ -13,6 +13,7 @@ from fastapi.staticfiles import StaticFiles
 from dotenv import load_dotenv
 from starlette.concurrency import run_in_threadpool
 
+from app import __version__
 from app.ai_advisor import ai_is_configured, ai_provider_name, explain_findings
 from app.ai_context import build_ai_context
 from app.connectors import SUPPORTED_FORMATS, import_static_report
@@ -38,7 +39,7 @@ load_dotenv(Path(BASE_DIR).parent / ".env")
 app = FastAPI(
     title="AAOS Security Auditor",
     description="Authorized, static-first Android Automotive application security assessment.",
-    version="0.2.0",
+    version=__version__,
 )
 app.mount("/static", StaticFiles(directory=os.path.join(BASE_DIR, "static")), name="static")
 
@@ -52,6 +53,7 @@ async def home() -> FileResponse:
 async def health() -> dict[str, object]:
     return {
         "status": "ok",
+        "version": __version__,
         "ai_enabled": ai_is_configured(),
         "ai_provider": ai_provider_name(),
         "knowledge_base": knowledge_base_status(),

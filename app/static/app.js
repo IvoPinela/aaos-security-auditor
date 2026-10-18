@@ -14,6 +14,8 @@ fetch('/api/health')
   .then((status) => {
     const aiStatus = document.querySelector('#ai-status');
     if (aiStatus && status.ai_enabled) aiStatus.textContent = `AI active · ${status.ai_provider}`;
+    const version = document.querySelector('#app-version');
+    if (version && status.version) version.textContent = status.version;
   })
   .catch(() => {});
 

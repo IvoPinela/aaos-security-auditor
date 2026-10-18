@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from app import __version__
 from app.masvs import MASVS_CONTROLS
 from app.rules_catalog import rule_catalog
 
@@ -59,7 +60,7 @@ def compare_with_baseline(report: dict[str, Any], baseline: dict[str, Any]) -> d
     }
 
 
-def to_sarif(report: dict[str, Any], tool_version: str = "0.2.0") -> dict[str, Any]:
+def to_sarif(report: dict[str, Any], tool_version: str = __version__) -> dict[str, Any]:
     """Emit SARIF 2.1.0 without source snippets; locations are path/line only."""
     catalog = {entry["id"]: entry for entry in rule_catalog()}
     suppressed = report.get("suppressed_findings", []) or []

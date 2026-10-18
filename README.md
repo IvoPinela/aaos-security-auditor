@@ -19,6 +19,10 @@ Find what matters in an in-vehicle app **before it reaches the road**: reproduci
 
 > **Defensive and authorized by design.** Static analysis only. No app execution, fuzzing, traffic interception, or contact with devices, vehicles, CAN buses or ECUs. Use it only on software you are authorized to assess.
 
+<p align="center">
+  <img src="docs/screenshots/report.png" alt="Report view: severity distribution, policy note, derived AAOS threat model and validation phases" width="720">
+</p>
+
 ---
 
 ## Why this exists
