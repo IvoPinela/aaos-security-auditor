@@ -19,6 +19,7 @@ from app.car_permissions import (
     protection_level,
 )
 from app.masvs import enrich_findings, masvs_summary
+from app.sbom import dependency_summary, parse_gradle_dependencies
 from app.source_mask import BlockIndex, mask_comments
 
 ANDROID_NS = "http://schemas.android.com/apk/res/android"
@@ -315,6 +316,19 @@ RULES: tuple[dict[str, Any], ...] = (
         "recommendation": "Use java.security.SecureRandom for tokens, nonces, salts and keys.",
         "profile": "Cryptography",
         "suffixes": {".kt", ".java"},
+    },
+    {
+        "id": "ANDROID-GRADLE-INSECURE-REPO",
+        "pattern": re.compile(
+            r"(?:\burl\s*(?:=\s*)?(?:uri\s*\(\s*)?|\bmaven\s*\(\s*)[\"']http://(?!(?:localhost|127\.0\.0\.1|10\.0\.2\.2)\b)"
+            r"|[Aa]llowInsecureProtocol\s*=\s*true\b"
+        ),
+        "severity": "high",
+        "title": "Dependency repository over plain HTTP",
+        "summary": "A Gradle repository is declared with http:// or allows an insecure protocol; artifacts can be tampered with in transit, which puts attacker-controlled code into the build.",
+        "recommendation": "Use https:// repositories, remove allowInsecureProtocol, and verify artifacts with Gradle dependency verification (checksums or signatures).",
+        "profile": "Build and dependencies",
+        "suffixes": {".gradle", ".kts"},
     },
     {
         "id": "ANDROID-RELEASE-NOT-MINIFIED",
@@ -656,7 +670,7 @@ def _inspect_manifest(path: str, source: str, *, include_aaos: bool) -> tuple[li
     return findings, metadata
 
 
-def analyze_source_directory(files: dict[str, bytes], profile: str = "aaos") -> dict[str, Any]:
+def analyze_source_directory(files: dict[str, bytes], profile: str = "aaos", project_name: str | None = None) -> dict[str, Any]:
     """Inspect a bounded, in-memory source snapshot; never extract or execute project files."""
     if profile not in {"android_app", "aaos"}:
         raise ValueError("Invalid profile. Choose android_app or aaos.")
@@ -751,6 +765,24 @@ def analyze_source_directory(files: dict[str, bytes], profile: str = "aaos") -> 
                 findings.append(_finding(rule, path, line_number, line))
                 if sum(item["rule_id"] == rule["id"] and item["source_path"] == path for item in findings) >= 10:
                     break
+
+    dependencies, dependency_warnings = parse_gradle_dependencies(normalized)
+    for dependency in dependencies:
+        if dependency["version_state"] != "dynamic":
+            continue
+        coordinate = f"{dependency['group']}:{dependency['name']}:{dependency['version']}"
+        findings.append({
+            "rule_id": "ANDROID-DEPENDENCY-DYNAMIC-VERSION",
+            "title": "Dependency with a dynamic version",
+            "severity": "low",
+            "summary": f"{coordinate} in {dependency['declared_in']} uses a dynamic version (+, range, latest or SNAPSHOT); builds are not reproducible and a compromised release is pulled in automatically.",
+            "recommendation": "Pin an exact version, use a version catalog and Gradle dependency locking or verification, and update deliberately.",
+            "evidence": f"{dependency['declared_in']}:{dependency['line']}",
+            "source_path": dependency["declared_in"],
+            "line": dependency["line"],
+            "profile": "Build and dependencies",
+            "_anchor": coordinate,
+        })
 
     car_permissions = privileged_car_permissions(manifest_permissions)
     if profile == "aaos" and car_permissions:
@@ -955,7 +987,7 @@ def analyze_source_directory(files: dict[str, bytes], profile: str = "aaos") -> 
         "analysis_profile": profile,
         "profile_label": "Android app · MASVS/MSTG-inspired" if profile == "android_app" else "Android Automotive · app baseline + AAOS",
         "analyzed_at": datetime.now(timezone.utc).isoformat(),
-        "project_name": next((PurePosixPath(path).parts[0] for path in normalized if len(PurePosixPath(path).parts) > 1), "Android project"),
+        "project_name": project_name or next((PurePosixPath(path).parts[0] for path in normalized if len(PurePosixPath(path).parts) > 1), "Android project"),
         "package_name": manifest_metadata.get("package_name", "Android project"),
         "version_name": "Directory analysis",
         "version_code": "—",
@@ -985,6 +1017,9 @@ def analyze_source_directory(files: dict[str, bytes], profile: str = "aaos") -> 
         "source_bytes": sum(len(data) for data in normalized.values()),
         "source_sha256": digest.hexdigest(),
         "car_permissions": classify_car_permissions(manifest_permissions),
+        "dependencies": dependencies,
+        "dependency_summary": dependency_summary(dependencies),
+        "dependency_warnings": dependency_warnings,
         "profiles_run": profiles,
         "severity_counts": severity_counts,
         "risk_level": risk_level,

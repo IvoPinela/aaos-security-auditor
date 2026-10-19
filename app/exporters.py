@@ -7,6 +7,7 @@ from typing import Any
 from app import __version__
 from app.masvs import MASVS_CONTROLS
 from app.rules_catalog import rule_catalog
+from app.threat_model import with_threat_model
 
 SEVERITY_ORDER = ("critical", "high", "medium", "low", "info")
 SARIF_LEVEL = {"critical": "error", "high": "error", "medium": "warning", "low": "note", "info": "note"}
@@ -146,6 +147,7 @@ def _md(value: Any) -> str:
 
 def to_markdown(report: dict[str, Any]) -> str:
     """Render a reviewer-friendly Markdown report (no source code or secret values)."""
+    report = with_threat_model(report)
     findings = report.get("findings", [])
     counts = report.get("severity_counts", {})
     is_source = report.get("report_type") == "source_directory"

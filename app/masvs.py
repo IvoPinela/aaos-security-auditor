@@ -73,6 +73,8 @@ RULE_MASVS: dict[str, tuple[str, ...]] = {
     "ANDROID-INSECURE-RANDOM": ("MASVS-CRYPTO-1",),
     "ANDROID-PROVIDER-GRANT-URI": ("MASVS-PLATFORM-1", "MASVS-STORAGE-2"),
     "AAOS-DATA-EGRESS-REVIEW": ("MASVS-PRIVACY-1", "MASVS-NETWORK-1"),
+    "ANDROID-GRADLE-INSECURE-REPO": ("MASVS-CODE-3", "MASVS-NETWORK-1"),
+    "ANDROID-DEPENDENCY-DYNAMIC-VERSION": ("MASVS-CODE-3",),
 }
 
 # CWE ids are attached only where the mapping is unambiguous; unknown rules map to no CWE.
@@ -110,6 +112,8 @@ RULE_CWE: dict[str, tuple[str, ...]] = {
     "ANDROID-PROVIDER-GRANT-URI": ("CWE-926",),
     "ANDROID-PENDINGINTENT-MUTABLE": ("CWE-927",),
     "ANDROID-DYNAMIC-RECEIVER": ("CWE-927",),
+    "ANDROID-GRADLE-INSECURE-REPO": ("CWE-319",),
+    "ANDROID-DEPENDENCY-DYNAMIC-VERSION": ("CWE-1357",),
 }
 
 # Used for findings imported from external scanners, which report CWE but not our rule IDs.

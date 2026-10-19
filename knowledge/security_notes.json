@@ -480,5 +480,22 @@
       "MOBSF-*"
     ],
     "content": "MobSF mixes code, manifest and API analysis. 'good/secure' findings are discarded on import. MobSF's severity uses its own criteria (high/warning/info) and is not directly comparable with this auditor's rules. Many rules are code patterns with false positives in third-party libraries; confirm whether the file belongs to the app's code or to a dependency. Use the imported CWE to cross-reference the MASVS controls."
+  },
+  {
+    "id": "gradle-supply-chain",
+    "title": "Gradle repositories and dependency versions",
+    "rule_ids": [
+      "ANDROID-GRADLE-INSECURE-REPO",
+      "ANDROID-DEPENDENCY-DYNAMIC-VERSION"
+    ],
+    "masvs": [
+      "MASVS-CODE-3",
+      "MASVS-NETWORK-1"
+    ],
+    "cwe": [
+      "CWE-319",
+      "CWE-1357"
+    ],
+    "content": "A repository declared with http:// (or allowInsecureProtocol = true) lets anyone on the network path replace an artifact, which puts attacker-controlled code into the build and then into the app and, on AAOS, into a vehicle image. This is a build-time supply chain risk, so fix it even when the app never talks to that host at runtime. Use https repositories, remove the insecure flag, and enable Gradle dependency verification (checksums or signatures). Local repositories on localhost or the emulator host are the usual legitimate exception; confirm they are not used in release builds. Dynamic versions (+, ranges, latest.release, SNAPSHOT) make builds non-reproducible and pull in a new, possibly compromised release without review. Pin exact versions, prefer a version catalog, use dependency locking, and update on purpose. The declared dependency inventory and CycloneDX SBOM are derived from build files only: transitive dependencies and BOM-managed versions are not resolved, so run OSV-Scanner or Trivy on the resolved graph for CVEs."
   }
 ]

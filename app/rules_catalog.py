@@ -28,6 +28,7 @@ STRUCTURAL_RULES: tuple[dict[str, str], ...] = (
     {"id": "ANDROID-PERM-RECORD_AUDIO", "severity": "info", "title": "Microphone access requested", "profile": "Permissions", "scope": "apk"},
     {"id": "ANDROID-PROVIDER-GRANT-URI", "severity": "medium", "title": "Provider exported with grantUriPermissions", "profile": "Manifest and AAOS", "scope": "apk,source"},
     {"id": "AAOS-DATA-EGRESS-REVIEW", "severity": "low", "title": "Vehicle/location data with network access", "profile": "AAOS vehicle APIs", "scope": "apk,source:aaos"},
+    {"id": "ANDROID-DEPENDENCY-DYNAMIC-VERSION", "severity": "low", "title": "Dependency with a dynamic version", "profile": "Build and dependencies", "scope": "source"},
     {"id": "AAOS-FEATURE-UNCONFIRMED", "severity": "info", "title": "AAOS compatibility not confirmed", "profile": "Manifest and AAOS", "scope": "apk,source:aaos"},
     {"id": "AAOS-PRIVILEGED-CAR-PERMISSION", "severity": "medium", "title": "Sensitive vehicle permissions requested", "profile": "AAOS vehicle APIs", "scope": "apk,source:aaos"},
     {"id": "AAOS-VEHICLE-API-REVIEW", "severity": "info", "title": "Android Automotive APIs found", "profile": "AAOS vehicle APIs", "scope": "source:aaos"},

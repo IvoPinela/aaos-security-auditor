@@ -19,6 +19,8 @@ from app.ai_context import build_ai_context
 from app.connectors import SUPPORTED_FORMATS, import_static_report
 from app.directory_scanner import MAX_SOURCE_FILE_BYTES, analyze_source_directory
 from app.exporters import to_markdown, to_sarif
+from app.html_report import to_html
+from app.sbom import to_cyclonedx
 from app.knowledge import knowledge_base_status, notes_for_rule, retrieve_context, search_notes
 from app.masvs import MASVS_CONTROLS, MASVS_VERSION, enrich_findings
 from app.pentest_plan import build_pentest_plan
@@ -179,8 +181,8 @@ async def export_report(
     locations: bool = Query(True, description="ai-context: include path:line (for local use by the assistant)"),
 ) -> Response:
     """Convert a report JSON produced by this app to SARIF 2.1.0, Markdown or an AI briefing."""
-    if export_format not in {"sarif", "markdown", "ai-context"}:
-        raise HTTPException(status_code=404, detail="Unknown format. Use sarif, markdown or ai-context.")
+    if export_format not in {"sarif", "markdown", "ai-context", "html", "sbom"}:
+        raise HTTPException(status_code=404, detail="Unknown format. Use sarif, markdown, ai-context, html or sbom.")
     body = await request.body()
     if len(body) > MAX_EXPORT_BYTES:
         raise HTTPException(status_code=413, detail="The report exceeds the 10 MB export limit.")
@@ -193,6 +195,10 @@ async def export_report(
     report["findings"] = [finding for finding in report["findings"] if isinstance(finding, dict)]
     if export_format == "sarif":
         return JSONResponse(to_sarif(report, app.version), media_type="application/sarif+json")
+    if export_format == "html":
+        return Response(to_html(report), media_type="text/html; charset=utf-8")
+    if export_format == "sbom":
+        return JSONResponse(to_cyclonedx(report), media_type="application/vnd.cyclonedx+json")
     if export_format == "ai-context":
         return PlainTextResponse(build_ai_context(report, include_locations=locations), media_type="text/markdown; charset=utf-8")
     return PlainTextResponse(to_markdown(report), media_type="text/markdown; charset=utf-8")

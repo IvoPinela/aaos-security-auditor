@@ -203,6 +203,23 @@ CORPUS: dict[str, dict] = {
         "vulnerable": ["val sessionToken = Random().nextInt().toString()", "String token = Long.toHexString((long) Math.random());", "val nonce = Random().nextLong()"],
         "safe": ["val token = SecureRandom().nextInt()", "val delay = Random().nextInt(100)"],
     },
+    "ANDROID-GRADLE-INSECURE-REPO": {
+        "file": GRADLE,
+        "vulnerable": [
+            'repositories { maven { url "http://repo.example.com/maven" } }',
+            'repositories { maven { url = uri("http://repo.example.com/maven") } }',
+            'repositories { maven("http://repo.example.com/maven") }',
+            'repositories { maven { url = uri("https://repo.example.com"); isAllowInsecureProtocol = true } }',
+            "repositories { maven { url 'https://repo.example.com'\n allowInsecureProtocol = true } }",
+        ],
+        "safe": [
+            'repositories { maven { url "https://repo.example.com/maven" } }',
+            'repositories { maven { url = uri("http://localhost:8081/repository") } }',
+            'repositories { maven { url = uri("http://10.0.2.2:8081/repo") } }',
+            'repositories { maven("https://jitpack.io") }',
+            '// repositories { maven { url "http://old.example.com" } }',
+        ],
+    },
     "ANDROID-RELEASE-NOT-MINIFIED": {
         "file": GRADLE_KTS,
         "vulnerable": ["android { buildTypes { release { isMinifyEnabled = false } } }", "release {\n    minifyEnabled false\n}"],

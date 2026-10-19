@@ -92,6 +92,14 @@ def _project_facts(report: dict[str, Any], findings: list[dict[str, Any]], inclu
                      f"{len(classified) - system_only - grantable} not in the table")
     if components or report.get("deep_links"):
         lines.append(f"- **Components:** {len(components)} declared · {exported} exported · {len(report.get('deep_links', []))} browsable deep link(s)")
+    summary = report.get("dependency_summary")
+    if isinstance(summary, dict) and summary.get("total"):
+        advisories = any(str(finding.get("rule_id", "")).startswith(("OSV-SCANNER-", "TRIVY-")) for finding in findings)
+        lines.append(
+            f"- **Dependencies:** {_clean(summary.get('total'), 6)} declared ({_clean(summary.get('pinned', 0), 6)} pinned, "
+            f"{_clean(summary.get('dynamic', 0), 6)} dynamic, {_clean(summary.get('unresolved', 0), 6)} unresolved); "
+            + ("advisories were imported" if advisories else "no advisory data imported, so CVE exposure is unknown")
+        )
     if report.get("source_file_count"):
         lines.append(f"- **Source files analyzed:** {_clean(report.get('source_file_count'), 12)}")
     imported = report.get("imported_reports") or []

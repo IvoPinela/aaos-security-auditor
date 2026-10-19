@@ -79,7 +79,7 @@ THREATS: tuple[dict[str, Any], ...] = (
     {
         "id": "T-SUPPLY", "stride": "Tampering / Elevation of privilege", "title": "Dependency with a known vulnerability",
         "asset": "Third-party code inside the app process",
-        "rules": ("OSV-SCANNER-*", "TRIVY-CVE-*", "TRIVY-GHSA-*", "TRIVY-GO-*"),
+        "rules": ("OSV-SCANNER-*", "TRIVY-CVE-*", "TRIVY-GHSA-*", "TRIVY-GO-*", "ANDROID-GRADLE-INSECURE-REPO", "ANDROID-DEPENDENCY-DYNAMIC-VERSION"),
         "validation": "Confirm whether the vulnerable functionality is reachable and update; record documented exceptions.",
     },
 )
@@ -142,8 +142,8 @@ def build_threat_model(report: dict[str, Any]) -> dict[str, Any]:
          "detail": f"{len(car_permissions)} android.car permission(s); {len(report.get('aaos_api_references', []))} vehicle API reference(s)"},
         {"id": "sensors", "name": "Location and sensors", "present": bool(permissions & {"android.permission.ACCESS_FINE_LOCATION", "android.permission.ACCESS_COARSE_LOCATION", "android.permission.RECORD_AUDIO", "android.permission.CAMERA"}),
          "detail": "Location, microphone or camera requested in the manifest"},
-        {"id": "supply", "name": "Dependencies", "present": any(_matches(rule, ("OSV-SCANNER-*", "TRIVY-*")) for rule in rule_ids),
-         "detail": "Imported dependency advisories (OSV-Scanner/Trivy)"},
+        {"id": "supply", "name": "Dependencies", "present": bool(report.get("dependencies")) or any(_matches(rule, ("OSV-SCANNER-*", "TRIVY-*", "ANDROID-GRADLE-*", "ANDROID-DEPENDENCY-*")) for rule in rule_ids),
+         "detail": f"{len(report.get('dependencies', []))} declared dependencies; advisories only when OSV-Scanner or Trivy results are imported"},
     ]
 
     threats: list[dict[str, Any]] = []
@@ -179,3 +179,19 @@ def build_threat_model(report: dict[str, Any]) -> dict[str, Any]:
         "validation_phases": phases,
         "not_assessed": not_assessed,
     }
+
+
+def with_threat_model(report: dict[str, Any]) -> dict[str, Any]:
+    """Return the report with `pentest_plan` and `threat_model` present, computing them when missing.
+
+    Exporters call this so a raw analysis result renders the same as one produced by the API or CLI.
+    """
+    if report.get("threat_model"):
+        return report
+    from app.pentest_plan import build_pentest_plan
+
+    enriched = {**report}
+    findings = [finding for finding in enriched.get("findings", []) if isinstance(finding, dict)]
+    enriched.setdefault("pentest_plan", build_pentest_plan(findings, enriched.get("deep_links", [])))
+    enriched["threat_model"] = build_threat_model(enriched)
+    return enriched

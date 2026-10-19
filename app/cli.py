@@ -12,6 +12,8 @@ from typing import Any, Sequence
 from app.ai_context import build_ai_context
 from app.connectors import import_static_report, merge_imported_findings
 from app.directory_scanner import ALLOWED_SUFFIXES, IGNORED_PARTS, MAX_SOURCE_FILE_BYTES, analyze_source_directory
+from app.html_report import to_html
+from app.sbom import to_cyclonedx
 from app.exporters import SEVERITY_ORDER, compare_with_baseline, filter_by_severity, to_markdown, to_sarif
 from app.knowledge import validate_knowledge_base
 from app.pentest_plan import build_pentest_plan
@@ -77,7 +79,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Read-only static Android/AAOS source audit")
     parser.add_argument("directory", type=Path, nargs="?", help="Authorized Android project directory")
     parser.add_argument("--profile", choices=("android_app", "aaos"), default=None, help="Rule profile (default: aaos, or settings.profile from aaos.toml)")
-    parser.add_argument("--format", choices=("json", "sarif", "markdown", "ai-context"), default="json", help="Output format; ai-context is a Markdown briefing for an AI assistant")
+    parser.add_argument("--format", choices=("json", "sarif", "markdown", "html", "sbom", "ai-context"), default="json", help="Output format; html is a self-contained report, sbom a CycloneDX bill of materials, ai-context a Markdown briefing for an AI assistant")
     parser.add_argument(
         "--import", dest="imports", action="append", type=Path, default=[], metavar="REPORT",
         help="Merge an external report (Semgrep, SARIF, Gitleaks, OSV-Scanner, Trivy, MobSF JSON or Android Lint XML); repeatable",
@@ -129,7 +131,9 @@ def main(argv: Sequence[str] | None = None) -> int:
             else:
                 policy, policy_path, policy_root = load_project_policy(source_files)
         settings = policy.settings if policy else {}
-        report = analyze_source_directory(source_files, profile=args.profile or settings.get("profile", "aaos"))
+        report = analyze_source_directory(
+            source_files, profile=args.profile or settings.get("profile", "aaos"), project_name=args.directory.resolve().name,
+        )
         import_summaries = []
         for import_path in args.imports:
             imported = import_static_report(import_path.read_bytes(), import_path.name)
@@ -158,6 +162,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         output = json.dumps(to_sarif(report), ensure_ascii=False, indent=2)
     elif args.format == "markdown":
         output = to_markdown(report)
+    elif args.format == "html":
+        output = to_html(report)
+    elif args.format == "sbom":
+        output = json.dumps(to_cyclonedx(report), ensure_ascii=False, indent=2)
     elif args.format == "ai-context":
         output = build_ai_context(report, include_locations=not args.no_locations)
     else:
