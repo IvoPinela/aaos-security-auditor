@@ -101,3 +101,35 @@ jobs:
           python -m app.cli tests/ui/fixtures/Climate --profile aaos --no-config --fail-on high > /dev/null
           code=$?
           test "$code" -eq 1 || { echo "expected exit code 1, got $code"; exit 1; }
+
+  action:
+    name: GitHub Action (self-test)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run the Action with a gate that passes
+        id: pass
+        uses: ./
+        with:
+          path: tests/ui/fixtures/Climate
+          fail-on: none
+          no-config: "true"
+          upload-sarif: "false"
+      - name: Outputs and artifacts exist
+        run: |
+          test "${{ steps.pass.outputs.gate }}" = "passed"
+          for f in "${{ steps.pass.outputs.report-file }}" "${{ steps.pass.outputs.sarif-file }}" "${{ steps.pass.outputs.sbom-file }}" "${{ steps.pass.outputs.html-file }}"; do
+            test -s "$f" || { echo "missing $f"; exit 1; }
+          done
+      - name: Run the Action with a gate that must trip
+        id: trip
+        uses: ./
+        continue-on-error: true
+        with:
+          path: tests/ui/fixtures/Climate
+          fail-on: high
+          no-config: "true"
+          upload-sarif: "false"
+      - name: The tripped gate failed the step
+        run: test "${{ steps.trip.outcome }}" = "failure"

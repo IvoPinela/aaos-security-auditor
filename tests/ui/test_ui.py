@@ -142,7 +142,7 @@ def test_aaos_findings_show_protection_levels(report_page: Page) -> None:
 
 def test_report_buttons_are_in_english(report_page: Page) -> None:
     actions = report_page.inner_text(".report-actions")
-    for label in ("Download JSON", "Export findings CSV", "Export SARIF", "Export Markdown", "AI briefing", "Import external report", "Set baseline"):
+    for label in ("Download JSON", "Export findings CSV", "Export SARIF", "Export Markdown", "Export HTML", "AI briefing", "Export SBOM", "Import external report", "Set baseline"):
         assert label in actions
 
 
@@ -156,6 +156,10 @@ def test_threat_model_validation_phases_and_checklist(report_page: Page) -> None
     report_page.locator(".pentest-check input").first.check()
     report_page.wait_for_function("document.querySelector('.pentest-progress').textContent.includes('1 of')")
     assert "in this session" in report_page.inner_text(".pentest-progress")
+
+
+def test_dynamic_dependency_version_is_reported(report_page: Page) -> None:
+    assert "Dependency with a dynamic version" in report_page.inner_text("#finding-list")
 
 
 def test_inventory_panel_loads_lazily(report_page: Page) -> None:
@@ -195,6 +199,15 @@ def test_exports_sarif_markdown_briefing_and_csv(report_page: Page, tmp_path: Pa
 
     name, body = download(report_page, "csv", tmp_path)
     assert name.endswith(".csv") and "masvs" in body.splitlines()[0]
+
+    name, body = download(report_page, "export-html", tmp_path)
+    assert name.endswith(".html") and "<h2>Findings</h2>" in body and "default-src 'none'" in body
+    assert "<script" not in body.lower()
+
+    name, body = download(report_page, "export-sbom", tmp_path)
+    bom = json.loads(body)
+    assert name.endswith(".cdx.json") and bom["bomFormat"] == "CycloneDX"
+    assert {component["name"] for component in bom["components"]} == {"okhttp", "gson", "junit"}
 
 
 # --- connectors and baseline ------------------------------------------------------

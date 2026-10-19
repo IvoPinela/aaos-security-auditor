@@ -43,14 +43,15 @@ Generic mobile scanners know nothing about that chain. This tool does: it flags 
 
 | | |
 | --- | --- |
-| 🔎 **54 deterministic rules** | Manifest, network, WebView, IPC, storage, crypto, secrets, build and AAOS checks. Evidence is always `path:line`, never code or secret values |
+| 🔎 **56 deterministic rules** | Manifest, network, WebView, IPC, storage, crypto, secrets, build, supply chain and AAOS checks. Comment-aware, with a vulnerable-and-safe test corpus per rule. Evidence is always `path:line`, never code or secret values |
 | 🚘 **AAOS-aware profile** | Automotive feature declaration, privileged `android.car` permissions, vehicle API references, Car App Library, vehicle-data egress review |
 | 🧭 **MASVS + CWE on every finding** | Triage by standard, with a per-control summary in each report |
 | 🧩 **7 scanner connectors** | Merge Semgrep, SARIF/CodeQL, Gitleaks, OSV-Scanner, Trivy, MobSF and Android Lint into one report |
 | 🛡️ **Derived threat model** | Attack surface, STRIDE threats and a 7-phase manual validation plan |
 | 🤖 **AI-ready by default** | A sanitized Markdown briefing for Claude or any assistant, hardened against prompt injection |
-| 🧠 **Curated knowledge base** | 33 notes retrieved per rule, with MASVS, CWE and primary sources |
-| ⚙️ **CI-ready CLI** | SARIF for GitHub code scanning, `--fail-on`, baselines that gate only on *new* findings, stable fingerprints |
+| 🧠 **Curated knowledge base** | 34 notes retrieved per rule, with MASVS, CWE and primary sources |
+| ⚙️ **CI-ready** | A **GitHub Action**, SARIF for code scanning, `--fail-on`, baselines that gate only on *new* findings, stable fingerprints |
+| 📦 **SBOM and reports** | CycloneDX SBOM from Gradle, a self-contained HTML report for non-technical readers, plus JSON, SARIF, Markdown and CSV |
 | 🗂️ **Project policy** | `aaos.toml` with settings and **justified, expiring suppressions**, plus inline `aaos-ignore` comments |
 | 🧰 **Claude Code skills** | Triage, remediation, CI gate, threat modeling and rule authoring |
 
@@ -108,6 +109,49 @@ python -m app.cli ./android --profile aaos                       # full JSON rep
 python -m app.cli ./android --format sarif -o aaos.sarif         # GitHub code scanning
 python -m app.cli ./android --baseline baseline.json --fail-on high   # CI gate on new findings only
 ```
+
+## Use it in GitHub Actions
+
+Add the auditor to any Android or AAOS repository:
+
+```yaml
+name: security
+on: [push, pull_request]
+
+permissions:
+  contents: read
+  security-events: write      # only needed to upload SARIF to code scanning
+
+jobs:
+  aaos-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: IvoPinela/aaos-security-auditor@main    # pin a tag or commit SHA in real projects
+        with:
+          path: .                  # the Android project directory
+          profile: aaos            # or android_app; empty uses aaos.toml or aaos
+          fail-on: high            # none | info | low | medium | high | critical
+```
+
+What happens: the project is analyzed, the SARIF goes to **code scanning** (alerts keep their identity when lines move),
+a Markdown summary is added to the job, and the job **fails if a finding at or above `fail-on` exists**. The reports
+are written to the runner and exposed as outputs.
+
+| Input | Meaning |
+| --- | --- |
+| `path`, `profile` | Project directory and rule profile |
+| `fail-on` | Severity that fails the job (default `high`) |
+| `baseline` | Earlier JSON report; the gate then counts only **new** findings |
+| `imports` | External reports to merge, one path per line (Semgrep, SARIF, Gitleaks, OSV-Scanner, Trivy, MobSF, Lint) |
+| `config`, `no-config` | Use a specific `aaos.toml`, or ignore the project policy |
+| `upload-sarif`, `sarif-category` | Control the code scanning upload |
+
+Outputs: `gate` (`passed` or `failed`), `report-file`, `sarif-file`, `markdown-file`, `html-file`, `sbom-file`.
+
+**Adopting it on an existing project without failing on day one:** run once with `fail-on: none`, keep the JSON report
+as `security-baseline.json`, then set `baseline: security-baseline.json` and `fail-on: low` so only new findings
+block merges. Justified exceptions go in `aaos.toml`.
 
 ## 🤖 Android Automotive meets AI
 
@@ -181,7 +225,23 @@ The validation plan ships as a checklist for an **isolated AAOS emulator or benc
 | `AAOS-CAR-APP-LIBRARY` | Android Auto, AAOS or both: different environments and requirements |
 | `ANDROID-SHARED-USER-ID` | Common in OEM system apps; review privilege scope and IPC surface |
 
-Plus the general Android set: debuggable and test-only builds, backup, exported components, cleartext and Network Security Config, WebView settings, PendingIntent and FileProvider, SharedPreferences credentials, weak crypto, SQL concatenation, dynamic code loading and release hardening. Print the full catalog with `python -m app.cli --list-rules`.
+Plus the general Android set: debuggable and test-only builds, backup, exported components, cleartext and Network Security Config, WebView settings, PendingIntent and FileProvider, SharedPreferences credentials, weak crypto, SQL concatenation, dynamic code loading, release hardening, plain-HTTP Gradle repositories and dynamic dependency versions. Print the full catalog with `python -m app.cli --list-rules`.
+
+## Reports and SBOM
+
+| Format | CLI | Use it for |
+| --- | --- | --- |
+| JSON | `--format json` | Everything, including suppressed findings, dependencies and the threat model |
+| SARIF 2.1.0 | `--format sarif` | GitHub code scanning (with fingerprints, CWE tags and suppression justifications) |
+| Markdown | `--format markdown` | Pull request comments and wikis |
+| **HTML** | `--format html` | Handing a report to managers, auditors or customers: **one file, no JavaScript, no network access**, escaped and protected by a Content-Security-Policy |
+| **CycloneDX SBOM** | `--format sbom` | Supplier and compliance requests; feed it to OSV-Scanner or Trivy for CVEs |
+| AI briefing | `--format ai-context` | Claude or any assistant |
+
+The SBOM lists **declared** dependencies from `build.gradle`, `build.gradle.kts` and `libs.versions.toml` (string and map
+notation, version catalog references, platform/BOM entries). Every entry says whether its version is `pinned`, `dynamic`
+(`+`, ranges, `latest`, `SNAPSHOT`) or `unresolved` (a variable or a BOM decides it). Transitive dependencies are **not**
+resolved, and the SBOM says so in its metadata; run a resolver-based tool on the built graph when you need the full tree.
 
 ## Connectors
 
@@ -248,7 +308,7 @@ Each ships with evaluation cases. Dynamic-action skills (Frida, objection) were 
 | Option | Effect |
 | --- | --- |
 | `--profile aaos\|android_app` | Rule profile (default `aaos`) |
-| `--format json\|sarif\|markdown\|ai-context` | Output format |
+| `--format json\|sarif\|markdown\|html\|sbom\|ai-context` | Output format |
 | `-o <file>` | Write UTF-8 output to a file |
 | `--import <report>` | Merge an external report (repeatable) |
 | `--baseline <report.json>` | Compare with an earlier report; with `--fail-on`, only new findings count |
@@ -268,7 +328,7 @@ Interactive docs at `/docs`.
 | --- | --- |
 | `POST /api/analyze` · `POST /api/analyze-directory` | Analyze an APK or a source directory |
 | `POST /api/connectors/import-static-report` · `GET /api/connectors` | Import an external report; list formats |
-| `POST /api/export/{sarif\|markdown\|ai-context}` | Convert a report |
+| `POST /api/export/{sarif\|markdown\|html\|sbom\|ai-context}` | Convert a report |
 | `POST /api/threat-model` | Recompute the threat model |
 | `GET /api/rules` · `GET /api/knowledge` | Rule catalog; knowledge lookup |
 | `GET /api/health` | Status |
@@ -280,11 +340,12 @@ Interactive docs at `/docs`.
 ## Project layout
 
 ```text
-app/        FastAPI app, CLI, scanners, connectors, MASVS/CWE mapping,
-            threat model, AI briefing and advisor, exporters, web UI
+app/        FastAPI app, CLI, scanners, comment-aware rule engine, connectors,
+            MASVS/CWE mapping, threat model, SBOM, HTML report, AI briefing and advisor, web UI
+action.yml  GitHub Action (the logic is in scripts/run_action.sh)
 knowledge/  Curated security notes
 docs/       Research notes (AI pentest landscape)
-tests/      113 tests
+tests/      unit, API, precision corpus, Action script and real-browser tests
 .claude/    Claude Code skills
 ```
 
@@ -300,7 +361,7 @@ pytest tests/ui                     # drives the real web UI; set UI_BROWSER_CHA
 
 GitHub Actions runs everything on every push and pull request: the test suite on Python 3.11 to 3.13 (plus Windows), the browser tests in Chromium, and a self-scan that checks SARIF output, fingerprints and the `--fail-on` gate. Dependabot keeps dependencies and workflow actions current.
 
-The suite fails if a rule has no MASVS mapping or no knowledge note, so new rules cannot ship half-wired.
+The suite fails if a rule has no MASVS mapping, no knowledge note, or no vulnerable-and-safe samples in the precision corpus (`tests/test_rule_corpus.py`), so new rules cannot ship half-wired. See [CONTRIBUTING.md](CONTRIBUTING.md), [SECURITY.md](SECURITY.md) and the [CHANGELOG](CHANGELOG.md).
 
 ## Limits
 
@@ -315,7 +376,7 @@ Released under the [MIT License](LICENSE). The bundled `community-android-securi
 
 ## Contributing
 
-Ideas and rules are welcome, especially AAOS-specific checks and real-world false-positive reports. Start with the `aaos-rule-authoring` skill, which lists every file a rule touches.
+Ideas and rules are welcome, especially AAOS-specific checks and real-world false-positive reports. Read [CONTRIBUTING.md](CONTRIBUTING.md) first; the `aaos-rule-authoring` skill lists every file a rule touches. Report vulnerabilities privately, as described in [SECURITY.md](SECURITY.md).
 
 ---
 

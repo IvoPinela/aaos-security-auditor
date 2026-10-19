@@ -1,0 +1,95 @@
+name: AAOS Security Auditor
+description: >-
+  Static security analysis for Android and Android Automotive OS projects: findings mapped to OWASP MASVS and CWE,
+  SARIF for code scanning, an AAOS threat model, a CycloneDX SBOM and a severity gate. It never runs your app.
+author: IvoPinela
+branding:
+  icon: shield
+  color: green
+
+inputs:
+  path:
+    description: Android project directory, relative to the workspace.
+    default: "."
+  profile:
+    description: "Rule profile: aaos or android_app. Empty uses settings.profile from aaos.toml, or aaos."
+    default: ""
+  fail-on:
+    description: "Fail the job at or above this severity: none, info, low, medium, high or critical."
+    default: "high"
+  config:
+    description: Path to an aaos.toml policy file. Empty auto-discovers one in the project.
+    default: ""
+  no-config:
+    description: Ignore aaos.toml (no suppressions or settings).
+    default: "false"
+  baseline:
+    description: Earlier JSON report. When set, the gate only counts findings that are new since that report.
+    default: ""
+  imports:
+    description: >-
+      External reports to merge, one path per line (Semgrep, SARIF, Gitleaks, OSV-Scanner, Trivy, MobSF JSON, Android Lint XML).
+    default: ""
+  upload-sarif:
+    description: Upload the SARIF file to GitHub code scanning (needs permission security-events write).
+    default: "true"
+  sarif-category:
+    description: Category for the code scanning upload.
+    default: aaos-security-auditor
+  python-version:
+    description: Python version used to run the auditor.
+    default: "3.12"
+
+outputs:
+  gate:
+    description: "passed or failed, according to fail-on."
+    value: ${{ steps.analyze.outputs.gate }}
+  report-file:
+    description: Path of the JSON report.
+    value: ${{ steps.analyze.outputs.report-file }}
+  sarif-file:
+    description: Path of the SARIF file.
+    value: ${{ steps.analyze.outputs.sarif-file }}
+  markdown-file:
+    description: Path of the Markdown report.
+    value: ${{ steps.analyze.outputs.markdown-file }}
+  html-file:
+    description: Path of the self-contained HTML report.
+    value: ${{ steps.analyze.outputs.html-file }}
+  sbom-file:
+    description: Path of the CycloneDX SBOM.
+    value: ${{ steps.analyze.outputs.sbom-file }}
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-python@v5
+      with:
+        python-version: ${{ inputs.python-version }}
+    - name: Install the auditor
+      shell: bash
+      run: python -m pip install --quiet -r "${{ github.action_path }}/requirements.txt"
+    - name: Analyze
+      id: analyze
+      shell: bash
+      env:
+        INPUT_PATH: ${{ inputs.path }}
+        INPUT_PROFILE: ${{ inputs.profile }}
+        INPUT_FAIL_ON: ${{ inputs.fail-on }}
+        INPUT_CONFIG: ${{ inputs.config }}
+        INPUT_NO_CONFIG: ${{ inputs.no-config }}
+        INPUT_BASELINE: ${{ inputs.baseline }}
+        INPUT_IMPORTS: ${{ inputs.imports }}
+      run: bash "${{ github.action_path }}/scripts/run_action.sh"
+    - name: Upload SARIF to code scanning
+      if: ${{ always() && inputs.upload-sarif == 'true' && steps.analyze.outputs.sarif-file != '' }}
+      uses: github/codeql-action/upload-sarif@v3
+      with:
+        sarif_file: ${{ steps.analyze.outputs.sarif-file }}
+        category: ${{ inputs.sarif-category }}
+    - name: Enforce the gate
+      if: ${{ steps.analyze.outputs.gate == 'failed' }}
+      shell: bash
+      run: |
+        echo "::error::AAOS Security Auditor found findings at or above '${{ inputs.fail-on }}'. See the job summary."
+        exit 1
