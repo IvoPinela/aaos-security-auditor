@@ -9,12 +9,12 @@ A rule in this project is more than a regex. A rule is complete only when all of
 
 | Piece | File | Enforced by |
 |---|---|---|
-| Detection | `app/directory_scanner.py` `RULES` (source regex) or `_inspect_manifest` / `app/scanner.py` (manifest/APK) | your new test |
-| Catalog entry (structural rules only) | `app/rules_catalog.py` `STRUCTURAL_RULES` | `test_rule_catalog_covers_every_regex_rule_once` |
-| MASVS + CWE mapping | `app/masvs.py` `RULE_MASVS`, `RULE_CWE` (use only unambiguous CWE ids) | `test_rule_catalog_covers_every_regex_rule_once` (no unmapped security rules) |
-| Knowledge note | `knowledge/security_notes.json` | `test_every_rule_has_knowledge_note`, `python -m app.cli --check-knowledge` |
-| Threat link (optional) | `app/threat_model.py` `THREATS` (add the rule ID/glob to the threat it supports) | `tests/test_connectors_context.py` |
-| Manual check (optional) | `app/pentest_plan.py` `FINDING_CHECKS` | `test_every_finding_check_in_pentest_plan_is_a_known_rule` |
+| Detection | `aaos_auditor/directory_scanner.py` `RULES` (source regex) or `_inspect_manifest` / `aaos_auditor/scanner.py` (manifest/APK) | your new test |
+| Catalog entry (structural rules only) | `aaos_auditor/rules_catalog.py` `STRUCTURAL_RULES` | `test_rule_catalog_covers_every_regex_rule_once` |
+| MASVS + CWE mapping | `aaos_auditor/masvs.py` `RULE_MASVS`, `RULE_CWE` (use only unambiguous CWE ids) | `test_rule_catalog_covers_every_regex_rule_once` (no unmapped security rules) |
+| Knowledge note | `aaos_auditor/knowledge/security_notes.json` | `test_every_rule_has_knowledge_note`, `python -m aaos_auditor.cli --check-knowledge` |
+| Threat link (optional) | `aaos_auditor/threat_model.py` `THREATS` (add the rule ID/glob to the threat it supports) | `tests/test_connectors_context.py` |
+| Manual check (optional) | `aaos_auditor/pentest_plan.py` `FINDING_CHECKS` | `test_every_finding_check_in_pentest_plan_is_a_known_rule` |
 | Docs | `README.md` rule list | review |
 
 ## Step by step
@@ -39,7 +39,7 @@ A rule in this project is more than a regex. A rule is complete only when all of
    - at least one near-miss negative (the secure variant, e.g. `AES/GCM/NoPadding`),
    - for XML/Gradle rules, a test that the same text in a `.kt` file does **not** match if `suffixes` is set,
    - for secret-like rules, `assert secret not in json.dumps(report)`.
-9. **Run** `python -m pytest -q` and `python -m app.cli --check-knowledge`, then `python -m app.cli --list-rules` to eyeball the catalog row.
+9. **Run** `python -m pytest -q` and `python -m aaos_auditor.cli --check-knowledge`, then `python -m aaos_auditor.cli --list-rules` to eyeball the catalog row.
 10. **README**: add the rule to the profile list in "What is implemented".
 
 ## Tuning an existing rule

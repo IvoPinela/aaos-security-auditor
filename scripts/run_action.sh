@@ -39,12 +39,12 @@ for format in json sarif markdown sbom html; do
     json) file="report.json";; sarif) file="results.sarif";; markdown) file="report.md";;
     sbom) file="sbom.cdx.json";; html) file="report.html";;
   esac
-  "$PYTHON" -m app.cli "$target" ${args[@]+"${args[@]}"} --fail-on none --format "$format" -o "$OUT_DIR/$file"
+  "$PYTHON" -m aaos_auditor.cli "$target" ${args[@]+"${args[@]}"} --fail-on none --format "$format" -o "$OUT_DIR/$file"
 done
 
 # The gate is evaluated separately so its exit code can be reported as an output.
 set +e
-"$PYTHON" -m app.cli "$target" ${args[@]+"${args[@]}"} --fail-on "$FAIL_ON" --format json -o /dev/null 2> "$OUT_DIR/gate.log"
+"$PYTHON" -m aaos_auditor.cli "$target" ${args[@]+"${args[@]}"} --fail-on "$FAIL_ON" --format json -o /dev/null 2> "$OUT_DIR/gate.log"
 code=$?
 set -e
 if [ "$code" -eq 0 ]; then gate="passed"; elif [ "$code" -eq 1 ]; then gate="failed"; else cat "$OUT_DIR/gate.log" >&2; exit "$code"; fi

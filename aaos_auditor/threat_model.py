@@ -188,7 +188,7 @@ def with_threat_model(report: dict[str, Any]) -> dict[str, Any]:
     """
     if report.get("threat_model"):
         return report
-    from app.pentest_plan import build_pentest_plan
+    from aaos_auditor.pentest_plan import build_pentest_plan
 
     enriched = {**report}
     findings = [finding for finding in enriched.get("findings", []) if isinstance(finding, dict)]

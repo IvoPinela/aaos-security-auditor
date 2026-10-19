@@ -7,11 +7,11 @@ from pathlib import Path
 import httpx
 import pytest
 
-from app import knowledge
-from app.cli import main as cli_main
-from app.directory_scanner import RULES, analyze_source_directory
-from app.exporters import compare_with_baseline, to_markdown, to_sarif
-from app.knowledge import (
+from aaos_auditor import knowledge
+from aaos_auditor.cli import main as cli_main
+from aaos_auditor.directory_scanner import RULES, analyze_source_directory
+from aaos_auditor.exporters import compare_with_baseline, to_markdown, to_sarif
+from aaos_auditor.knowledge import (
     _load_documents,
     notes_for_rule,
     reload_knowledge_base,
@@ -19,11 +19,11 @@ from app.knowledge import (
     search_notes,
     validate_knowledge_base,
 )
-from app.main import app
-from app.masvs import masvs_for_rule
-from app.pentest_plan import build_pentest_plan
-from app.rules_catalog import known_rule_ids, rule_catalog
-from app.scanner import ANDROID_NS
+from aaos_auditor.main import app
+from aaos_auditor.masvs import masvs_for_rule
+from aaos_auditor.pentest_plan import build_pentest_plan
+from aaos_auditor.rules_catalog import known_rule_ids, rule_catalog
+from aaos_auditor.scanner import ANDROID_NS
 
 
 def request(method: str, url: str, **kwargs: object) -> httpx.Response:
@@ -178,7 +178,7 @@ def test_rule_catalog_covers_every_regex_rule_once() -> None:
 
 
 def test_every_finding_check_in_pentest_plan_is_a_known_rule() -> None:
-    from app.pentest_plan import FINDING_CHECKS
+    from aaos_auditor.pentest_plan import FINDING_CHECKS
 
     assert set(FINDING_CHECKS) <= known_rule_ids()
     plan = build_pentest_plan([{"rule_id": "ANDROID-WEAK-CIPHER"}, {"rule_id": "ANDROID-STATIC-IV"}])

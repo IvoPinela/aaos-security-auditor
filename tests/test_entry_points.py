@@ -6,10 +6,10 @@ from xml.etree import ElementTree
 
 import pytest
 
-from app import scanner
-from app.directory_scanner import analyze_source_directory
-from app.entry_points import FilterInfo, component_role, unverified_web_link_hosts
-from app.scanner import ANDROID_NS, analyze_apk
+from aaos_auditor import scanner
+from aaos_auditor.directory_scanner import analyze_source_directory
+from aaos_auditor.entry_points import FilterInfo, component_role, unverified_web_link_hosts
+from aaos_auditor.scanner import ANDROID_NS, analyze_apk
 
 LAUNCHER = '''<activity android:name=".MainActivity" android:exported="true">
   <intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter>

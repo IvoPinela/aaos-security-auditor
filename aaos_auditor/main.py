@@ -13,21 +13,21 @@ from fastapi.staticfiles import StaticFiles
 from dotenv import load_dotenv
 from starlette.concurrency import run_in_threadpool
 
-from app import __version__
-from app.ai_advisor import ai_is_configured, ai_provider_name, explain_findings
-from app.ai_context import build_ai_context
-from app.connectors import SUPPORTED_FORMATS, import_static_report
-from app.directory_scanner import MAX_SOURCE_FILE_BYTES, analyze_source_directory
-from app.exporters import to_markdown, to_sarif
-from app.html_report import to_html
-from app.sbom import to_cyclonedx
-from app.knowledge import knowledge_base_status, notes_for_rule, retrieve_context, search_notes
-from app.masvs import MASVS_CONTROLS, MASVS_VERSION, enrich_findings
-from app.pentest_plan import build_pentest_plan
-from app.policy import apply_policy, load_project_policy
-from app.rules_catalog import rule_catalog
-from app.scanner import analyze_apk
-from app.threat_model import build_threat_model
+from aaos_auditor import __version__
+from aaos_auditor.ai_advisor import ai_is_configured, ai_provider_name, explain_findings
+from aaos_auditor.ai_context import build_ai_context
+from aaos_auditor.connectors import SUPPORTED_FORMATS, import_static_report
+from aaos_auditor.directory_scanner import MAX_SOURCE_FILE_BYTES, analyze_source_directory
+from aaos_auditor.exporters import to_markdown, to_sarif
+from aaos_auditor.html_report import to_html
+from aaos_auditor.sbom import to_cyclonedx
+from aaos_auditor.knowledge import knowledge_base_status, notes_for_rule, retrieve_context, search_notes
+from aaos_auditor.masvs import MASVS_CONTROLS, MASVS_VERSION, enrich_findings
+from aaos_auditor.pentest_plan import build_pentest_plan
+from aaos_auditor.policy import apply_policy, load_project_policy
+from aaos_auditor.rules_catalog import rule_catalog
+from aaos_auditor.scanner import analyze_apk
+from aaos_auditor.threat_model import build_threat_model
 
 MAX_UPLOAD_BYTES = 50 * 1024 * 1024
 MAX_EXPORT_BYTES = 10 * 1024 * 1024
@@ -36,6 +36,8 @@ MAX_DIRECTORY_FILES = 500
 MAX_CONNECTOR_REPORT_BYTES = 5 * 1024 * 1024
 APK_PARSE_LIMITER = asyncio.Semaphore(2)
 BASE_DIR = os.path.dirname(__file__)
+# A .env in the working directory wins; the repository root is the fallback for a source checkout.
+load_dotenv(Path.cwd() / ".env")
 load_dotenv(Path(BASE_DIR).parent / ".env")
 
 app = FastAPI(
@@ -249,3 +251,32 @@ async def import_connector_report(
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     finally:
         await file.close()
+
+
+LOOPBACK_HOSTS = {"127.0.0.1", "localhost", "::1"}
+
+
+def build_server_parser() -> "argparse.ArgumentParser":
+    import argparse
+
+    parser = argparse.ArgumentParser(prog="aaos-web", description="Start the AAOS Security Auditor web interface")
+    parser.add_argument("--host", default="127.0.0.1", help="Address to listen on (default 127.0.0.1, local only)")
+    parser.add_argument("--port", type=int, default=8000, help="Port to listen on (default 8000)")
+    return parser
+
+
+def serve(argv: "list[str] | None" = None) -> int:
+    """Run the web interface. Listens on localhost only unless you explicitly choose another host."""
+    import sys
+
+    import uvicorn
+
+    args = build_server_parser().parse_args(argv)
+    if args.host not in LOOPBACK_HOSTS:
+        print(
+            f"Warning: listening on {args.host}. The app has no authentication, TLS or rate limiting; "
+            "put it behind a reverse proxy that provides them, and do not expose it to the internet.",
+            file=sys.stderr,
+        )
+    uvicorn.run(app, host=args.host, port=args.port, log_level="warning")
+    return 0

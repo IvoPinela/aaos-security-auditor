@@ -39,9 +39,9 @@ jobs:
       - name: Unit and API tests
         run: python -m pytest -q
       - name: Knowledge base is valid
-        run: python -m app.cli --check-knowledge
+        run: python -m aaos_auditor.cli --check-knowledge
       - name: Rule catalog loads
-        run: python -m app.cli --list-rules
+        run: python -m aaos_auditor.cli --list-rules
 
   ui:
     name: Browser tests (Chromium)
@@ -84,7 +84,7 @@ jobs:
       - run: pip install -r requirements.txt
       - name: Scan the fixture project and produce SARIF
         # --fail-on none: this step only produces the report; the gate is checked in its own step below.
-        run: python -m app.cli tests/ui/fixtures/Climate --profile aaos --format sarif --fail-on none -o self-scan.sarif
+        run: python -m aaos_auditor.cli tests/ui/fixtures/Climate --profile aaos --format sarif --fail-on none -o self-scan.sarif
       - name: SARIF is valid and carries fingerprints
         run: |
           python - <<'EOF'
@@ -98,7 +98,7 @@ jobs:
       - name: Gate trips on high findings (fail-on high must exit 1)
         run: |
           set +e
-          python -m app.cli tests/ui/fixtures/Climate --profile aaos --no-config --fail-on high > /dev/null
+          python -m aaos_auditor.cli tests/ui/fixtures/Climate --profile aaos --no-config --fail-on high > /dev/null
           code=$?
           test "$code" -eq 1 || { echo "expected exit code 1, got $code"; exit 1; }
 
@@ -133,3 +133,32 @@ jobs:
           upload-sarif: "false"
       - name: The tripped gate failed the step
         run: test "${{ steps.trip.outcome }}" = "failure"
+
+  package:
+    name: Package (build, install, run)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Build the wheel
+        run: |
+          python -m pip install --upgrade pip build
+          python -m build
+      - name: Install it in a clean environment and run it
+        run: |
+          python -m venv /tmp/clean
+          /tmp/clean/bin/pip install --quiet dist/*.whl
+          cd /tmp
+          /tmp/clean/bin/aaos-audit --check-knowledge
+          /tmp/clean/bin/aaos-audit --list-rules | wc -l
+          /tmp/clean/bin/aaos-audit "$GITHUB_WORKSPACE/tests/ui/fixtures/Climate" --fail-on none --format sbom | python -c "import sys, json; assert json.load(sys.stdin)['bomFormat'] == 'CycloneDX'"
+          /tmp/clean/bin/python - <<'EOF'
+          import importlib.resources as r
+          files = r.files("aaos_auditor")
+          assert (files / "static" / "index.html").is_file(), "web interface missing from the wheel"
+          assert (files / "knowledge" / "security_notes.json").is_file(), "knowledge notes missing from the wheel"
+          print("package data present")
+          EOF

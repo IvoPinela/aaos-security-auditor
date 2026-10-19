@@ -8,13 +8,13 @@ from pathlib import Path
 import httpx
 import pytest
 
-from app.ai_context import build_ai_context
-from app.cli import main as cli_main
-from app.directory_scanner import analyze_source_directory
-from app.html_report import to_html
-from app.main import app
-from app.sbom import dependency_summary, parse_gradle_dependencies, parse_version_catalog, purl, to_cyclonedx
-from app.threat_model import build_threat_model
+from aaos_auditor.ai_context import build_ai_context
+from aaos_auditor.cli import main as cli_main
+from aaos_auditor.directory_scanner import analyze_source_directory
+from aaos_auditor.html_report import to_html
+from aaos_auditor.main import app
+from aaos_auditor.sbom import dependency_summary, parse_gradle_dependencies, parse_version_catalog, purl, to_cyclonedx
+from aaos_auditor.threat_model import build_threat_model
 
 CATALOG = b'''
 [versions]

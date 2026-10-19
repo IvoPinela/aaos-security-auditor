@@ -17,8 +17,8 @@ from pathlib import PurePosixPath
 from typing import Any
 from urllib.parse import quote
 
-from app import __version__
-from app.source_mask import mask_comments
+from aaos_auditor import __version__
+from aaos_auditor.source_mask import mask_comments
 
 CONFIGURATION = (
     r"(?:[a-z][A-Za-z]*(?:Implementation|Api|CompileOnly|RuntimeOnly|Kapt|Ksp|AnnotationProcessor)"

@@ -10,7 +10,7 @@ Wire the read-only CLI into a pipeline so new risky findings block merges and re
 ## CLI flags that matter
 
 ```
-python -m app.cli <project-dir> --profile aaos|android_app
+python -m aaos_auditor.cli <project-dir> --profile aaos|android_app
     --format json|sarif|markdown   # sarif for code scanning, markdown for PR comments
     -o <file>                      # write instead of stdout
     --fail-on none|info|low|medium|high|critical   # exit 1 at/above this severity
@@ -60,7 +60,7 @@ jobs:
       - run: pip install -r .auditor/requirements.txt
       - name: Scan (SARIF)
         working-directory: .auditor
-        run: python -m app.cli "$GITHUB_WORKSPACE/<android-root>" --profile aaos --format sarif -o "$GITHUB_WORKSPACE/aaos.sarif"
+        run: python -m aaos_auditor.cli "$GITHUB_WORKSPACE/<android-root>" --profile aaos --format sarif -o "$GITHUB_WORKSPACE/aaos.sarif"
       - uses: github/codeql-action/upload-sarif@v3
         if: always()
         with:
@@ -68,7 +68,7 @@ jobs:
           category: aaos-security-auditor
       - name: Gate on new high findings
         working-directory: .auditor
-        run: python -m app.cli "$GITHUB_WORKSPACE/<android-root>" --profile aaos --baseline "$GITHUB_WORKSPACE/security-baseline.json" --fail-on high --format markdown -o "$GITHUB_WORKSPACE/aaos.md"
+        run: python -m aaos_auditor.cli "$GITHUB_WORKSPACE/<android-root>" --profile aaos --baseline "$GITHUB_WORKSPACE/security-baseline.json" --fail-on high --format markdown -o "$GITHUB_WORKSPACE/aaos.md"
       - if: always()
         run: cat aaos.md >> "$GITHUB_STEP_SUMMARY"
 ```
@@ -82,7 +82,7 @@ Adapt the same three steps (scan → upload SARIF → gate) for GitLab (`artifac
   hooks:
     - id: aaos-audit
       name: AAOS security audit
-      entry: python -m app.cli . --profile aaos --fail-on high --min-severity medium --format markdown
+      entry: python -m aaos_auditor.cli . --profile aaos --fail-on high --min-severity medium --format markdown
       language: system
       pass_filenames: false
 ```

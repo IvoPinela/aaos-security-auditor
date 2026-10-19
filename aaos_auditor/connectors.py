@@ -578,7 +578,7 @@ SEVERITY_ORDER = {"critical": 0, "high": 1, "medium": 2, "low": 3, "info": 4}
 
 def merge_imported_findings(report: dict[str, Any], imported: list[dict[str, Any]]) -> dict[str, Any]:
     """Merge external findings into a report and recompute counts, risk level and MASVS summary."""
-    from app.masvs import enrich_findings, masvs_summary
+    from aaos_auditor.masvs import enrich_findings, masvs_summary
 
     existing = {(item.get("rule_id"), item.get("evidence")): item for item in report.get("findings", [])}
     for finding in enrich_findings(imported):

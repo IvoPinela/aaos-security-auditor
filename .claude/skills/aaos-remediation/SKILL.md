@@ -10,7 +10,7 @@ Fix findings with the smallest change that removes the risk without breaking beh
 ## Before editing
 
 1. Confirm the **target directory** and that the user owns it or is authorized to modify it. Never edit files outside it, and never edit this auditor's own code as part of a remediation.
-2. Save a baseline: `python -m app.cli <target> --profile <aaos|android_app> -o baseline.json` (from the auditor root). Write it outside the target tree or confirm it's git-ignored.
+2. Save a baseline: `python -m aaos_auditor.cli <target> --profile <aaos|android_app> -o baseline.json` (from the auditor root). Write it outside the target tree or confirm it's git-ignored.
 3. For each finding, open the cited file/line and confirm it is real and reachable (see the `aaos-finding-triage` skill). Don't "fix" false positives — note them instead.
 4. If a fix changes behavior (e.g. disabling cleartext breaks a dev server, removing `exported` breaks a launcher), **ask** before applying, and offer the variant-scoped alternative.
 
@@ -41,7 +41,7 @@ Prefer these idioms. Adjust to the project's language (Kotlin/Java), style, and 
 
 ## After editing
 
-1. Re-scan: `python -m app.cli <target> --profile <p> --baseline baseline.json --format markdown`.
+1. Re-scan: `python -m aaos_auditor.cli <target> --profile <p> --baseline baseline.json --format markdown`.
 2. Report: fixed (in `baseline_comparison.resolved`), still present (with reason), and **any new findings the fix introduced**, which must be zero or explained.
 3. List what still needs runtime confirmation on an emulator (merged manifest, NSC actually packaged, WebView behavior).
 4. Do not run Gradle, install the app, or start emulators unless the user explicitly asks. Never touch a vehicle, CAN bus or ECU.

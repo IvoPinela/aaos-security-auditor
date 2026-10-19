@@ -15,8 +15,8 @@ import zipfile
 import httpx
 import pytest
 
-from app.main import app
-from app.scanner import analyze_apk
+from aaos_auditor.main import app
+from aaos_auditor.scanner import analyze_apk
 from tests.axml import build_apk, build_axml
 
 MANIFEST = '''<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.oem.climate"

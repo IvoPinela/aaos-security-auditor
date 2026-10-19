@@ -11,11 +11,22 @@ All notable changes are documented here. The format follows [Keep a Changelog](h
   catalogs, platform/BOM entries and honest version states (pinned, dynamic, unresolved).
 - **Self-contained HTML report** (`--format html`, `POST /api/export/html`): one file, no JavaScript, strict
   Content-Security-Policy, fully escaped.
+- Rules `AAOS-CAR-APP-ALLOW-ALL-HOSTS`, `AAOS-CAR-APP-HOST-VALIDATION`, `AAOS-MEDIA-BROWSER-CALLER-VALIDATION` and `ANDROID-DEEPLINK-UNVERIFIED`.
+- The APK path is tested against the real Androguard parser with compiled binary manifests, and in the browser.
 - Rules `ANDROID-GRADLE-INSECURE-REPO` and `ANDROID-DEPENDENCY-DYNAMIC-VERSION`; a supply chain surface in the threat model.
 - Precision corpus: vulnerable and safe samples for every regex rule, plus documented limitations.
 - `SECURITY.md`, `CONTRIBUTING.md`, issue and pull request templates.
 
+### Packaging
+- **Installable**: `pipx install git+https://github.com/IvoPinela/aaos-security-auditor` gives the `aaos-audit` command
+  and the `aaos-web` launcher (localhost only unless you choose another host, with a warning). A `pyproject.toml` builds a wheel
+  that includes the web interface and the knowledge notes.
+- The Python package is now `aaos_auditor` (it was `app`, a name that cannot be published). Use `python -m aaos_auditor`
+  or `aaos-audit`. The notes moved to `aaos_auditor/knowledge/security_notes.json`.
+
 ### Changed
+- Exported-component noise: launcher activities are no longer reported as "exported without permission", and Car App and
+  media browser services get precise review points about validating the host or caller (AAOS profile).
 - Rules ignore comments (string literals are kept) and know their enclosing block, so `debug {}` build types,
   `BuildConfig.DEBUG` guards and `<debug-overrides>` no longer produce findings. Commented-out credentials are still reported.
 - Fewer false positives: `RSA/ECB/OAEP` is not block-cipher ECB, `tokenizer` is not a token, templates and resource

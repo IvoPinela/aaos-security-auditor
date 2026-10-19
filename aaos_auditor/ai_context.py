@@ -16,8 +16,8 @@ import json
 import re
 from typing import Any
 
-from app.masvs import MASVS_CONTROLS, enrich_findings
-from app.threat_model import build_threat_model
+from aaos_auditor.masvs import MASVS_CONTROLS, enrich_findings
+from aaos_auditor.threat_model import build_threat_model
 
 SEVERITY_ORDER = ("critical", "high", "medium", "low", "info")
 SEVERITY_RANK = {severity: index for index, severity in enumerate(SEVERITY_ORDER)}

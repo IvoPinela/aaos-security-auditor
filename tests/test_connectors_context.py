@@ -7,17 +7,17 @@ from pathlib import Path
 import httpx
 import pytest
 
-from app import ai_advisor
-from app.ai_context import build_ai_context
-from app.cli import main as cli_main
-from app.connectors import detect_format, import_static_report, merge_imported_findings
-from app.directory_scanner import analyze_source_directory
-from app.exporters import to_markdown, to_sarif
-from app.main import app
-from app.masvs import cwe_for_rule, masvs_for_cwe
-from app.pentest_plan import build_pentest_plan
-from app.scanner import ANDROID_NS
-from app.threat_model import build_threat_model
+from aaos_auditor import ai_advisor
+from aaos_auditor.ai_context import build_ai_context
+from aaos_auditor.cli import main as cli_main
+from aaos_auditor.connectors import detect_format, import_static_report, merge_imported_findings
+from aaos_auditor.directory_scanner import analyze_source_directory
+from aaos_auditor.exporters import to_markdown, to_sarif
+from aaos_auditor.main import app
+from aaos_auditor.masvs import cwe_for_rule, masvs_for_cwe
+from aaos_auditor.pentest_plan import build_pentest_plan
+from aaos_auditor.scanner import ANDROID_NS
+from aaos_auditor.threat_model import build_threat_model
 
 
 FAKE_AWS_KEY = "AKIA" + "ABCDEFGHIJKLMNOP"  # split on purpose: never a full key-shaped literal

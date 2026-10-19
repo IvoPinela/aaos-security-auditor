@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from app.directory_scanner import RULES
-from app.masvs import cwe_for_rule, masvs_for_rule
+from aaos_auditor.directory_scanner import RULES
+from aaos_auditor.masvs import cwe_for_rule, masvs_for_rule
 
 # Rules emitted by manifest/APK/Gradle logic rather than the regex table in directory_scanner.RULES.
 STRUCTURAL_RULES: tuple[dict[str, str], ...] = (

@@ -9,8 +9,8 @@ from __future__ import annotations
 from html import escape
 from typing import Any
 
-from app.masvs import MASVS_CONTROLS
-from app.threat_model import with_threat_model
+from aaos_auditor.masvs import MASVS_CONTROLS
+from aaos_auditor.threat_model import with_threat_model
 
 SEVERITIES = ("critical", "high", "medium", "low", "info")
 RISK_LABELS = {"elevated": "Elevated risk", "review": "Needs review", "informational": "No high or medium findings"}

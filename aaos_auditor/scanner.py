@@ -20,15 +20,15 @@ try:  # Androguard logs thousands of DEBUG lines per APK through loguru; they on
 except ImportError:  # pragma: no cover - loguru ships with androguard
     pass
 
-from app.directory_scanner import (
+from aaos_auditor.directory_scanner import (
     data_egress_finding,
     data_egress_signals,
     privileged_car_permission_finding,
     privileged_car_permissions,
 )
-from app.car_permissions import classify_car_permissions
-from app.entry_points import FilterInfo, component_role, role_finding, unverified_link_finding, unverified_web_link_hosts
-from app.masvs import enrich_findings, masvs_summary
+from aaos_auditor.car_permissions import classify_car_permissions
+from aaos_auditor.entry_points import FilterInfo, component_role, role_finding, unverified_link_finding, unverified_web_link_hosts
+from aaos_auditor.masvs import enrich_findings, masvs_summary
 
 ANDROID_NS = "http://schemas.android.com/apk/res/android"
 AUTOMOTIVE_FEATURE = "android.hardware.type.automotive"
@@ -240,7 +240,7 @@ def analyze_apk(data: bytes) -> dict[str, Any]:
                         "ANDROID-EXPORTED-UNGUARDED", "Component probably reachable without permission", "medium",
                         f"Component {component_name} {implicit_reason} and does not declare a permission; confirm the effective value on the target system.",
                         "Confirm the exposure on the target device; restrict the component or require an appropriate permission if the exposure is not intentional.",
-                        f"{component_type} {component_name}: android:exported ausente e android:permission ausente",
+                        f"{component_type} {component_name}: android:exported and android:permission both missing",
                     ))
                 else:
                     findings.append(Finding(

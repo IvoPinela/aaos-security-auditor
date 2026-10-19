@@ -24,11 +24,11 @@ A rule is more than a regex. It is complete only when all of these agree, and th
 
 | Piece | Where |
 | --- | --- |
-| Detector | `app/directory_scanner.py` (`RULES`) or the manifest and APK checks |
-| Catalog entry (structural rules) | `app/rules_catalog.py` |
-| MASVS and CWE | `app/masvs.py` |
-| Knowledge note | `knowledge/security_notes.json` |
-| Threat link (optional) | `app/threat_model.py` |
+| Detector | `aaos_auditor/directory_scanner.py` (`RULES`) or the manifest and APK checks |
+| Catalog entry (structural rules) | `aaos_auditor/rules_catalog.py` |
+| MASVS and CWE | `aaos_auditor/masvs.py` |
+| Knowledge note | `aaos_auditor/knowledge/security_notes.json` |
+| Threat link (optional) | `aaos_auditor/threat_model.py` |
 | **Vulnerable and safe samples** | `tests/test_rule_corpus.py` |
 | README mention | the coverage table |
 
@@ -44,7 +44,7 @@ If you use Claude Code, the `aaos-rule-authoring` skill in `.claude/skills/` wal
 
 ## Pull requests
 
-- Keep a change focused; add or update tests; run `pytest` and `python -m app.cli --check-knowledge`.
+- Keep a change focused; add or update tests; run `pytest` and `python -m aaos_auditor.cli --check-knowledge`.
 - Describe the behavior change and why. For rules, include the sample that motivated it.
 - New user-facing text is in English.
 - Do not commit secrets, real customer code or real keys, not even in tests. Build fake keys from two parts so that no

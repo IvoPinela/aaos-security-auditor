@@ -10,7 +10,7 @@ from pathlib import PurePosixPath
 from typing import Any
 from xml.etree import ElementTree
 
-from app.car_permissions import (
+from aaos_auditor.car_permissions import (
     PREFIX as CAR_PERMISSION_PREFIX,
     SOURCE_NOTE as CAR_PERMISSION_SOURCE_NOTE,
     classify_car_permissions,
@@ -18,10 +18,10 @@ from app.car_permissions import (
     is_third_party_grantable,
     protection_level,
 )
-from app.entry_points import FilterInfo, component_role, role_finding, unverified_link_finding, unverified_web_link_hosts
-from app.masvs import enrich_findings, masvs_summary
-from app.sbom import dependency_summary, parse_gradle_dependencies
-from app.source_mask import BlockIndex, mask_comments
+from aaos_auditor.entry_points import FilterInfo, component_role, role_finding, unverified_link_finding, unverified_web_link_hosts
+from aaos_auditor.masvs import enrich_findings, masvs_summary
+from aaos_auditor.sbom import dependency_summary, parse_gradle_dependencies
+from aaos_auditor.source_mask import BlockIndex, mask_comments
 
 ANDROID_NS = "http://schemas.android.com/apk/res/android"
 MAX_SOURCE_FILE_BYTES = 1_000_000

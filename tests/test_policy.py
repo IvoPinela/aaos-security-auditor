@@ -8,13 +8,13 @@ from pathlib import Path
 import httpx
 import pytest
 
-from app.ai_context import build_ai_context
-from app.cli import main as cli_main
-from app.directory_scanner import analyze_source_directory
-from app.exporters import compare_with_baseline, to_markdown, to_sarif
-from app.fingerprints import assign_fingerprints
-from app.main import app
-from app.policy import apply_policy, find_policy_file, load_project_policy, parse_policy
+from aaos_auditor.ai_context import build_ai_context
+from aaos_auditor.cli import main as cli_main
+from aaos_auditor.directory_scanner import analyze_source_directory
+from aaos_auditor.exporters import compare_with_baseline, to_markdown, to_sarif
+from aaos_auditor.fingerprints import assign_fingerprints
+from aaos_auditor.main import app
+from aaos_auditor.policy import apply_policy, find_policy_file, load_project_policy, parse_policy
 
 TODAY = date(2026, 6, 1)
 
@@ -383,7 +383,7 @@ def test_directory_api_applies_aaos_toml_and_survives_a_broken_one() -> None:
 # --- android.car protection levels --------------------------------------------
 
 def test_protection_levels_come_from_the_aosp_table() -> None:
-    from app.car_permissions import classify_car_permissions, protection_level
+    from aaos_auditor.car_permissions import classify_car_permissions, protection_level
 
     assert protection_level("android.car.permission.CAR_SPEED") == "dangerous"
     assert protection_level("android.car.permission.CONTROL_CAR_CLIMATE") == "signature|privileged"
@@ -425,7 +425,7 @@ def test_dangerous_car_permission_with_internet_is_a_data_egress_signal() -> Non
 
 
 def test_unknown_permissions_fall_back_to_the_conservative_name_list() -> None:
-    from app.directory_scanner import privileged_car_permissions
+    from aaos_auditor.directory_scanner import privileged_car_permissions
 
     assert privileged_car_permissions(["android.car.permission.CONTROL_CAR_FUTURE_THING"]) == ["android.car.permission.CONTROL_CAR_FUTURE_THING"]
     assert privileged_car_permissions(["android.car.permission.CAR_SPEED", "android.car.permission.CAR_INFO"]) == []

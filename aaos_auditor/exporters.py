@@ -4,10 +4,10 @@ from __future__ import annotations
 
 from typing import Any
 
-from app import __version__
-from app.masvs import MASVS_CONTROLS
-from app.rules_catalog import rule_catalog
-from app.threat_model import with_threat_model
+from aaos_auditor import __version__
+from aaos_auditor.masvs import MASVS_CONTROLS
+from aaos_auditor.rules_catalog import rule_catalog
+from aaos_auditor.threat_model import with_threat_model
 
 SEVERITY_ORDER = ("critical", "high", "medium", "low", "info")
 SARIF_LEVEL = {"critical": "error", "high": "error", "medium": "warning", "low": "note", "info": "note"}

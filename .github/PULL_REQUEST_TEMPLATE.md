@@ -6,7 +6,7 @@
 
 - [ ] Tests added or updated (`pytest`)
 - [ ] New or changed rule: vulnerable **and** safe samples in `tests/test_rule_corpus.py`
-- [ ] New or changed rule: MASVS/CWE mapping and a knowledge note (`python -m app.cli --check-knowledge`)
+- [ ] New or changed rule: MASVS/CWE mapping and a knowledge note (`python -m aaos_auditor.cli --check-knowledge`)
 - [ ] No secrets, customer code or real keys, including in tests
 - [ ] User-facing text is in English
 - [ ] README or CHANGELOG updated when behavior changes

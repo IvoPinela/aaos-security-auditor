@@ -12,17 +12,17 @@ from xml.etree import ElementTree
 import httpx
 import pytest
 
-from app import scanner
-from app import ai_advisor
-from app.connectors import import_static_report
-from app.cli import collect_source_files
-from app.cli import main as cli_main
-from app import main as main_module
-from app.main import app
-from app.directory_scanner import analyze_source_directory
-from app.knowledge import _load_documents, knowledge_base_status, retrieve_context
-from app.pentest_plan import build_pentest_plan
-from app.scanner import ANDROID_NS, analyze_apk
+from aaos_auditor import scanner
+from aaos_auditor import ai_advisor
+from aaos_auditor.connectors import import_static_report
+from aaos_auditor.cli import collect_source_files
+from aaos_auditor.cli import main as cli_main
+from aaos_auditor import main as main_module
+from aaos_auditor.main import app
+from aaos_auditor.directory_scanner import analyze_source_directory
+from aaos_auditor.knowledge import _load_documents, knowledge_base_status, retrieve_context
+from aaos_auditor.pentest_plan import build_pentest_plan
+from aaos_auditor.scanner import ANDROID_NS, analyze_apk
 
 
 def post_analyze(**kwargs: object) -> httpx.Response:

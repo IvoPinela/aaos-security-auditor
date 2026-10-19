@@ -1,0 +1,59 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "aaos-security-auditor"
+dynamic = ["version"]
+description = "Static security analysis for Android and Android Automotive OS apps: MASVS/CWE-mapped findings, AAOS threat model, SARIF, SBOM and an AI-ready briefing."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "IvoPinela" }]
+keywords = ["android", "android-automotive", "aaos", "security", "static-analysis", "owasp-masvs", "sarif", "sbom"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Security",
+]
+dependencies = [
+    "fastapi>=0.115,<1.0",
+    "uvicorn[standard]>=0.34,<1.0",
+    "python-multipart>=0.0.20,<1.0",
+    "androguard>=4.1,<5.0",
+    "httpx>=0.28,<1.0",
+    "python-dotenv>=1.0,<2.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0,<10", "playwright>=1.45,<2"]
+
+[project.scripts]
+aaos-audit = "aaos_auditor.cli:main"
+aaos-web = "aaos_auditor.main:serve"
+
+[project.urls]
+Homepage = "https://github.com/IvoPinela/aaos-security-auditor"
+Issues = "https://github.com/IvoPinela/aaos-security-auditor/issues"
+Changelog = "https://github.com/IvoPinela/aaos-security-auditor/blob/main/CHANGELOG.md"
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.dynamic]
+version = { attr = "aaos_auditor.__version__" }
+
+[tool.setuptools.packages.find]
+include = ["aaos_auditor*"]
+
+[tool.setuptools.package-data]
+aaos_auditor = ["static/*", "knowledge/*.json"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

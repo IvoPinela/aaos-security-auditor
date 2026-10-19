@@ -1,6 +1,6 @@
 ---
 name: aaos-finding-triage
-description: Use when the user has an AAOS Security Auditor JSON report (from the web UI download or `python -m app.cli`) and wants findings triaged, deduplicated, prioritized, or classified as true positive / false positive / needs runtime evidence. Also use for "which findings matter", "explain this report", "is this a false positive", or MASVS-oriented summaries. Read-only; never runs the target app or tests a vehicle.
+description: Use when the user has an AAOS Security Auditor JSON report (from the web UI download or `python -m aaos_auditor.cli`) and wants findings triaged, deduplicated, prioritized, or classified as true positive / false positive / needs runtime evidence. Also use for "which findings matter", "explain this report", "is this a false positive", or MASVS-oriented summaries. Read-only; never runs the target app or tests a vehicle.
 ---
 
 # AAOS Finding Triage
@@ -15,7 +15,7 @@ Turn a raw auditor report into a short, defensible priority list. The scanner is
 
 ## Workflow
 
-1. **Confirm scope.** Note package, profile (`aaos` vs `android_app`), `source_sha256`/`apk_sha256`, and `analyzed_at`. Don't triage a report against a different tree than the one it hashed — if the tree has changed, re-run `python -m app.cli <dir> --profile <p> --baseline <old.json>` and triage the `baseline_comparison.new` list instead.
+1. **Confirm scope.** Note package, profile (`aaos` vs `android_app`), `source_sha256`/`apk_sha256`, and `analyzed_at`. Don't triage a report against a different tree than the one it hashed — if the tree has changed, re-run `python -m aaos_auditor.cli <dir> --profile <p> --baseline <old.json>` and triage the `baseline_comparison.new` list instead.
 2. **Respect recorded decisions.** Read `suppressed_findings` and `policy` first: suppressed findings carry a team-written reason, so do not re-raise them unless the reason is weak or no longer true. Report expired and stale suppressions.
 3. **Group before judging.** Collapse findings by `rule_id`; one root cause across 10 lines is one item. Use `masvs_summary` to show which MASVS areas are affected.
 4. **Verify each group** by opening the cited file/line:
@@ -31,7 +31,7 @@ Turn a raw auditor report into a short, defensible priority list. The scanner is
    - `needs-runtime` — only an authorized emulator/bench test can decide (list the check from `pentest_plan`).
    - `false-positive` — explain why in one line (test source set, debug block, comment, non-crypto use).
 6. **Prioritize** with the scanner severity as the starting point, then adjust one step up or down with a stated reason (reachability, data sensitivity, AAOS vehicle impact, exposure to other apps). Never upgrade to `critical` without a demonstrated path.
-7. **Look up guidance** for each rule in `knowledge/security_notes.json` (or `GET /api/knowledge?rule_id=<ID>` if the server is running) and use it for wording and caveats.
+7. **Look up guidance** for each rule in `aaos_auditor/knowledge/security_notes.json` (or `GET /api/knowledge?rule_id=<ID>` if the server is running) and use it for wording and caveats.
 
 ## Output format
 

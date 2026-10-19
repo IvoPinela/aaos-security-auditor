@@ -34,7 +34,7 @@ from fnmatch import fnmatchcase
 from pathlib import PurePosixPath
 from typing import Any
 
-from app.masvs import masvs_summary
+from aaos_auditor.masvs import masvs_summary
 
 CONFIG_NAME = "aaos.toml"
 SEVERITY_ORDER = ("critical", "high", "medium", "low", "info")

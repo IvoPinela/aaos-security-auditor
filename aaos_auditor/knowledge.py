@@ -9,7 +9,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
-DEFAULT_KNOWLEDGE_FILE = Path(__file__).resolve().parent.parent / "knowledge" / "security_notes.json"
+DEFAULT_KNOWLEDGE_FILE = Path(__file__).resolve().parent / "knowledge" / "security_notes.json"
 MAX_CONTEXT_CHARS = 6_000
 TRUNCATION_MARK = " […]"
 SEVERITY_RANK = {"critical": 0, "high": 1, "medium": 2, "low": 3, "info": 4}

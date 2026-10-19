@@ -73,7 +73,7 @@ flowchart LR
 A real run on a small sample project:
 
 ```text
-$ python -m app.cli ./Proj --format markdown
+$ python -m aaos_auditor.cli ./Proj --format markdown
 
 | Severity | Rule                           | Title                                     | MASVS                            | CWE     |
 | -------- | ------------------------------ | ----------------------------------------- | -------------------------------- | ------- |
@@ -87,27 +87,35 @@ $ python -m app.cli ./Proj --format markdown
 
 Requires **Python 3.11+**.
 
-```powershell
-# Windows (PowerShell)
-python -m venv .venv
-.venv\Scripts\Activate.ps1
-pip install -r requirements.txt
-uvicorn app.main:app --reload          # open http://127.0.0.1:8000
-```
+**Install** (isolated, gives you the `aaos-audit` and `aaos-web` commands):
 
 ```bash
-# macOS / Linux
-python3 -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
-uvicorn app.main:app --reload
+pipx install git+https://github.com/IvoPinela/aaos-security-auditor
+# or inside a virtual environment: pip install git+https://github.com/IvoPinela/aaos-security-auditor
 ```
 
-No server needed for the CLI:
+**Command line**: no server needed:
 
 ```bash
-python -m app.cli ./android --profile aaos                       # full JSON report
-python -m app.cli ./android --format sarif -o aaos.sarif         # GitHub code scanning
-python -m app.cli ./android --baseline baseline.json --fail-on high   # CI gate on new findings only
+aaos-audit ./android --profile aaos                            # full JSON report
+aaos-audit ./android --format sarif -o aaos.sarif              # GitHub code scanning
+aaos-audit ./android --format html -o report.html              # a file to hand to someone
+aaos-audit ./android --baseline baseline.json --fail-on high   # CI gate on new findings only
+```
+
+**Web interface**: listens on localhost only:
+
+```bash
+aaos-web                  # open http://127.0.0.1:8000   (--port to change it)
+```
+
+**From a source checkout** (development):
+
+```bash
+python -m venv .venv && source .venv/bin/activate        # Windows: .venv\Scripts\Activate.ps1
+pip install -e ".[dev]"
+python -m aaos_auditor --list-rules                      # same CLI
+uvicorn aaos_auditor.main:app --reload                   # web interface with auto-reload
 ```
 
 ## Use it in GitHub Actions
@@ -160,8 +168,8 @@ AI is optional, and it is only as good as what you feed it. This project builds 
 **The briefing.** `--format ai-context` produces one Markdown document: scope, severity counts, findings grouped by root cause with MASVS and CWE, applicable AAOS threats, curated notes, what was *not* covered, and explicit response instructions.
 
 ```bash
-python -m app.cli ./android --import semgrep.json --import osv.json --format ai-context -o briefing.md
-python -m app.cli ./android --format ai-context --no-locations     # safe for a third-party service
+python -m aaos_auditor.cli ./android --import semgrep.json --import osv.json --format ai-context -o briefing.md
+python -m aaos_auditor.cli ./android --format ai-context --no-locations     # safe for a third-party service
 ```
 
 **Two ways to use it**
@@ -225,7 +233,7 @@ The validation plan ships as a checklist for an **isolated AAOS emulator or benc
 | `AAOS-CAR-APP-LIBRARY` | Android Auto, AAOS or both: different environments and requirements |
 | `ANDROID-SHARED-USER-ID` | Common in OEM system apps; review privilege scope and IPC surface |
 
-Plus the general Android set: debuggable and test-only builds, backup, exported components, cleartext and Network Security Config, WebView settings, PendingIntent and FileProvider, SharedPreferences credentials, weak crypto, SQL concatenation, dynamic code loading, release hardening, plain-HTTP Gradle repositories and dynamic dependency versions. Print the full catalog with `python -m app.cli --list-rules`.
+Plus the general Android set: debuggable and test-only builds, backup, exported components, cleartext and Network Security Config, WebView settings, PendingIntent and FileProvider, SharedPreferences credentials, weak crypto, SQL concatenation, dynamic code loading, release hardening, plain-HTTP Gradle repositories and dynamic dependency versions. Print the full catalog with `python -m aaos_auditor.cli --list-rules`.
 
 ## Reports and SBOM
 
@@ -335,16 +343,21 @@ Interactive docs at `/docs`.
 
 ## Knowledge base
 
-`knowledge/security_notes.json` holds 33 curated notes with `rule_ids` (exact IDs, globs such as `ANDROID-PERM-*`, or `*`), `masvs`, `cwe` and `references`. Retrieval is capped at 6,000 characters and ranked by the worst matching finding, so the highest-impact guidance is never cut. Validate with `python -m app.cli --check-knowledge`; use your own file with `AAOS_KNOWLEDGE_FILE`.
+`aaos_auditor/knowledge/security_notes.json` holds 33 curated notes with `rule_ids` (exact IDs, globs such as `ANDROID-PERM-*`, or `*`), `masvs`, `cwe` and `references`. Retrieval is capped at 6,000 characters and ranked by the worst matching finding, so the highest-impact guidance is never cut. Validate with `python -m aaos_auditor.cli --check-knowledge`; use your own file with `AAOS_KNOWLEDGE_FILE`.
 
 ## Project layout
 
 ```text
-app/        FastAPI app, CLI, scanners, comment-aware rule engine, connectors,
-            MASVS/CWE mapping, threat model, SBOM, HTML report, AI briefing and advisor, web UI
-action.yml  GitHub Action (the logic is in scripts/run_action.sh)
-knowledge/  Curated security notes
-docs/       Research notes (AI pentest landscape)
+aaos_auditor/            the installable package
+  cli.py, main.py        command line and FastAPI web app (aaos-audit, aaos-web)
+  directory_scanner.py   comment-aware rule engine; scanner.py analyzes APKs
+  connectors.py          importers for external scanners
+  masvs.py, car_permissions.py, threat_model.py, sbom.py, html_report.py, ai_context.py ...
+  static/                web interface
+  knowledge/             curated security notes (security_notes.json)
+action.yml               GitHub Action (the logic is in scripts/run_action.sh)
+pyproject.toml           packaging: pip/pipx install, console scripts
+docs/                    research notes (AI pentest landscape)
 tests/      unit, API, precision corpus, Action script and real-browser tests
 .claude/    Claude Code skills
 ```
@@ -352,7 +365,7 @@ tests/      unit, API, precision corpus, Action script and real-browser tests
 ## Development
 
 ```bash
-pip install -r requirements-dev.txt
+pip install -e ".[dev]"                 # or: pip install -r requirements-dev.txt
 pytest                              # unit and API tests (browser tests are skipped without Playwright)
 
 playwright install chromium         # once, for the browser tests

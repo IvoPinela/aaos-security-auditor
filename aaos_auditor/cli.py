@@ -9,17 +9,17 @@ import sys
 from pathlib import Path
 from typing import Any, Sequence
 
-from app.ai_context import build_ai_context
-from app.connectors import import_static_report, merge_imported_findings
-from app.directory_scanner import ALLOWED_SUFFIXES, IGNORED_PARTS, MAX_SOURCE_FILE_BYTES, analyze_source_directory
-from app.html_report import to_html
-from app.sbom import to_cyclonedx
-from app.exporters import SEVERITY_ORDER, compare_with_baseline, filter_by_severity, to_markdown, to_sarif
-from app.knowledge import validate_knowledge_base
-from app.pentest_plan import build_pentest_plan
-from app.policy import apply_policy, load_project_policy, parse_policy
-from app.rules_catalog import known_rule_ids, rule_catalog
-from app.threat_model import build_threat_model
+from aaos_auditor.ai_context import build_ai_context
+from aaos_auditor.connectors import import_static_report, merge_imported_findings
+from aaos_auditor.directory_scanner import ALLOWED_SUFFIXES, IGNORED_PARTS, MAX_SOURCE_FILE_BYTES, analyze_source_directory
+from aaos_auditor.html_report import to_html
+from aaos_auditor.sbom import to_cyclonedx
+from aaos_auditor.exporters import SEVERITY_ORDER, compare_with_baseline, filter_by_severity, to_markdown, to_sarif
+from aaos_auditor.knowledge import validate_knowledge_base
+from aaos_auditor.pentest_plan import build_pentest_plan
+from aaos_auditor.policy import apply_policy, load_project_policy, parse_policy
+from aaos_auditor.rules_catalog import known_rule_ids, rule_catalog
+from aaos_auditor.threat_model import build_threat_model
 
 MAX_TOTAL_BYTES = 20 * 1024 * 1024
 MAX_SOURCE_FILES = 500
@@ -96,7 +96,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--no-config", action="store_true", help="Ignore aaos.toml (no suppressions or settings)")
     parser.add_argument("--baseline", type=Path, help="Earlier JSON report; adds new/resolved comparison")
     parser.add_argument("--list-rules", action="store_true", help="Print the rule catalog and exit")
-    parser.add_argument("--check-knowledge", action="store_true", help="Validate knowledge/security_notes.json and exit")
+    parser.add_argument("--check-knowledge", action="store_true", help="Validate aaos_auditor/knowledge/security_notes.json and exit")
     args = parser.parse_args(argv)
     for stream in (sys.stdout, sys.stderr):
         # Windows consoles default to cp1252; reports are UTF-8 (Portuguese text, JSON consumers).
@@ -107,7 +107,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         _print_rules()
         return 0
     if args.list_connectors:
-        from app.connectors import SUPPORTED_FORMATS
+        from aaos_auditor.connectors import SUPPORTED_FORMATS
 
         for entry in SUPPORTED_FORMATS:
             print(f"{entry['label']:<18} {entry['produces']:<38} {entry['how_to']}")

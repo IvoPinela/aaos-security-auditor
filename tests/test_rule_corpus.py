@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import pytest
 
-from app.directory_scanner import RULES, analyze_source_directory
+from aaos_auditor.directory_scanner import RULES, analyze_source_directory
 
 AWS_KEY = "AKIA" + "ABCDEFGHIJKLMNOP"  # split on purpose: no full key-shaped literal in the repository
 

@@ -3,3 +3,10 @@ __pycache__/
 *.py[cod]
 .env
 .pytest_cache/
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+.playwright/
+test-results/

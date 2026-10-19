@@ -10,9 +10,9 @@ Turn scan results (plus any external scanner reports) into a phased review plan 
 ## Workflow
 
 1. Confirm the exact authorized project directory and profile (`aaos` or `android_app`). Don't scan adjacent projects.
-2. Ask which external reports exist. Offer to produce missing ones with the commands from `python -m app.cli --list-connectors` (Semgrep/SARIF, Gitleaks, OSV-Scanner, Trivy, Android Lint, MobSF). Do not run those tools yourself unless the user asks; they run in the user's environment.
+2. Ask which external reports exist. Offer to produce missing ones with the commands from `python -m aaos_auditor.cli --list-connectors` (Semgrep/SARIF, Gitleaks, OSV-Scanner, Trivy, Android Lint, MobSF). Do not run those tools yourself unless the user asks; they run in the user's environment.
 3. Run the scan with everything merged, from the auditor root:
-   `python -m app.cli <dir> --profile <p> --import semgrep.json --import osv.json --format ai-context -o briefing.md`
+   `python -m aaos_auditor.cli <dir> --profile <p> --import semgrep.json --import osv.json --format ai-context -o briefing.md`
    Use `--no-locations` if the briefing will be pasted into a third-party service.
 4. Read `briefing.md` and, if more depth is needed, the JSON report (`--format json`) fields `threat_model.threats`, `threat_model.validation_phases`, `threat_model.not_assessed`.
 5. Verify the top threats by opening the cited `path:line` locations. Mark each as confirmed statically, likely, needs-runtime, or probable false positive (see the `aaos-finding-triage` skill).

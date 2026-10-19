@@ -39,7 +39,7 @@ def _free_port() -> int:
 def base_url():
     port = _free_port()
     server = subprocess.Popen(
-        [sys.executable, "-m", "uvicorn", "app.main:app", "--port", str(port), "--log-level", "warning"],
+        [sys.executable, "-m", "uvicorn", "aaos_auditor.main:app", "--port", str(port), "--log-level", "warning"],
         cwd=ROOT, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
     )
     url = f"http://127.0.0.1:{port}"
@@ -111,7 +111,7 @@ def test_home_is_in_english(page: Page) -> None:
 
 
 def test_footer_shows_the_app_version(page: Page) -> None:
-    from app import __version__
+    from aaos_auditor import __version__
 
     page.wait_for_function(f"document.querySelector('#app-version').textContent === '{__version__}'")
 

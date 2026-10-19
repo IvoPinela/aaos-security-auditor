@@ -8,7 +8,7 @@ from __future__ import annotations
 from fnmatch import fnmatchcase
 from typing import Any
 
-from app.fingerprints import assign_fingerprints
+from aaos_auditor.fingerprints import assign_fingerprints
 
 MASVS_VERSION = "2.1"
 
