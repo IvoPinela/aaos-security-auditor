@@ -156,7 +156,9 @@ def parse_gradle_dependencies(files: dict[str, bytes]) -> tuple[list[dict[str, A
 
 def purl(dependency: dict[str, Any]) -> str:
     base = f"pkg:maven/{quote(dependency['group'], safe='')}/{quote(dependency['name'], safe='')}"
-    return f"{base}@{quote(dependency['version'], safe='')}" if dependency.get("version") else base
+    # Only an exact, pinned version identifies a release; "2.+" or a range would mislead vulnerability scanners.
+    pinned = dependency.get("version") and dependency.get("version_state", "pinned") == "pinned"
+    return f"{base}@{quote(dependency['version'], safe='')}" if pinned else base
 
 
 def dependency_summary(dependencies: list[dict[str, Any]]) -> dict[str, int]:
@@ -193,8 +195,10 @@ def to_cyclonedx(report: dict[str, Any]) -> dict[str, Any]:
                 {"name": "aaos:version-state", "value": dep["version_state"]},
             ],
         }
-        if dep.get("version"):
+        if dep.get("version") and dep["version_state"] == "pinned":
             component["version"] = dep["version"]
+        elif dep.get("version"):
+            component["properties"].append({"name": "aaos:declared-version", "value": str(dep["version"])})
         components.append(component)
     return {
         "bomFormat": "CycloneDX",

@@ -179,6 +179,9 @@ def test_cyclonedx_structure_and_determinism() -> None:
     state = {p["name"]: p["value"] for p in unresolved["properties"]}
     assert state["aaos:version-state"] == "unresolved"
     assert "declared dependencies only" in bom["metadata"]["properties"][0]["value"]
+    gson = next(component for component in bom["components"] if component["name"] == "gson")
+    assert "version" not in gson and gson["purl"].endswith("/gson")  # "2.+" is not a release
+    assert {"name": "aaos:declared-version", "value": "2.+"} in gson["properties"]
 
 
 # --- HTML report ----------------------------------------------------------------------------
