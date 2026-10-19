@@ -19,9 +19,11 @@ from app.car_permissions import (
     protection_level,
 )
 from app.masvs import enrich_findings, masvs_summary
+from app.source_mask import BlockIndex, mask_comments
 
 ANDROID_NS = "http://schemas.android.com/apk/res/android"
 MAX_SOURCE_FILE_BYTES = 1_000_000
+MAX_MATCHES_EXAMINED = 200
 ALLOWED_SUFFIXES = {".xml", ".kt", ".java", ".gradle", ".kts", ".properties", ".pro", ".toml"}
 IGNORED_PARTS = {".git", ".gradle", ".idea", ".venv", "venv", "build", "out", "target", "node_modules", "vendor", "generated"}
 
@@ -67,6 +69,7 @@ RULES: tuple[dict[str, Any], ...] = (
     {
         "id": "ANDROID-WEBVIEW-DEBUG",
         "pattern": re.compile(r"WebView\.setWebContentsDebuggingEnabled\s*\(\s*true\s*\)"),
+        "skip_in_blocks": re.compile(r"(?i)\bBuildConfig\.DEBUG\b|\bisDebug(?:gable)?\b"),
         "severity": "medium",
         "title": "WebView debugging enabled",
         "summary": "WebView content debugging is explicitly enabled.",
@@ -75,7 +78,13 @@ RULES: tuple[dict[str, Any], ...] = (
     },
     {
         "id": "ANDROID-TRUST-ALL-CERTS",
-        "pattern": re.compile(r"checkServerTrusted\s*\([^)]*\)\s*\{\s*\}|ALLOW_ALL_HOSTNAME_VERIFIER|setHostnameVerifier\s*\([^)]*ALLOW_ALL", re.IGNORECASE),
+        "pattern": re.compile(
+            r"checkServerTrusted\s*\([^)]*\)\s*(?::\s*\w+\s*)?\{\s*\}"
+            r"|ALLOW_ALL_HOSTNAME_VERIFIER|setHostnameVerifier\s*\([^)]*ALLOW_ALL"
+            r"|hostnameVerifier\s*\{[^}]{0,40}->\s*true\s*\}"
+            r"|\bboolean\s+verify\s*\([^)]*\)\s*\{\s*return\s+true\s*;?\s*\}",
+            re.IGNORECASE,
+        ),
         "severity": "high",
         "title": "Possible TLS validation disabled",
         "summary": "A permissive trust manager / hostname verifier pattern was found and needs review.",
@@ -93,7 +102,7 @@ RULES: tuple[dict[str, Any], ...] = (
     },
     {
         "id": "ANDROID-DYNAMIC-RECEIVER",
-        "pattern": re.compile(r"registerReceiver\s*\([^;\n]*\)\s*;", re.DOTALL),
+        "pattern": re.compile(r"\bregisterReceiver\s*\((?![^;\n]*RECEIVER_NOT_EXPORTED)"),
         "severity": "info",
         "title": "Dynamic receiver registration to review",
         "summary": "registerReceiver was found; review whether the receiver is exported and which flag is used on the supported Android versions.",
@@ -120,7 +129,11 @@ RULES: tuple[dict[str, Any], ...] = (
     },
     {
         "id": "ANDROID-SECRET-LITERAL",
-        "pattern": re.compile(r"(?i)\b(?:api[_-]?key|client[_-]?secret|password|passwd|access[_-]?token)\b\s*[:=]\s*[\"'][^\"'\s]{12,}[\"']"),
+        "pattern": re.compile(
+            r"(?i)\b(?:api[_-]?key|client[_-]?secret|password|passwd|access[_-]?token)\b\s*(?::\s*[\w.?<>]+\s*)?[:=]\s*"
+            r"[\"'](?!\$\{|\$[A-Za-z_]|@string/|\{\{)[^\"'\s]{12,}[\"']"
+        ),
+        "scan_comments": True,  # a commented-out credential is still in the repository
         "severity": "high",
         "title": "Possible hardcoded secret in code/configuration",
         "summary": "An assignment with a credential-like name and a long literal value was found; it may also be a placeholder or test data.",
@@ -130,7 +143,10 @@ RULES: tuple[dict[str, Any], ...] = (
     {
         "id": "ANDROID-LOG-SENSITIVE",
         # Bounded span: an unbounded [^\n]* is quadratic on long minified lines.
-        "pattern": re.compile(r"\b(?:Log\.(?:v|d|i|w|e)|System\.out\.print(?:ln)?)\s*\([^\n]{0,300}?(?:password|token|secret|authorization|credential)", re.IGNORECASE),
+        "pattern": re.compile(
+            r"\b(?:Log\.(?:v|d|i|w|e)|System\.out\.print(?:ln)?)\s*\([^\n]{0,300}?(?:password|token|secret|authorization|credential)s?(?![a-z])",
+            re.IGNORECASE,
+        ),
         "severity": "medium",
         "title": "Possible sensitive data in logs",
         "summary": "A logging call contains an identifier associated with credentials or sensitive data.",
@@ -141,6 +157,7 @@ RULES: tuple[dict[str, Any], ...] = (
         "id": "ANDROID-KNOWN-SECRET-FORMAT",
         # Private key headers and AWS access key IDs have distinctive formats with few false positives.
         "pattern": re.compile(r"-----BEGIN (?:RSA |EC |DSA |OPENSSH |ENCRYPTED )?PRIVATE KEY-----|\bAKIA[0-9A-Z]{16}\b"),
+        "scan_comments": True,
         "severity": "high",
         "title": "Known credential format found",
         "summary": "A private key header or an AWS-style key identifier was found; it may be test material, but it needs verification.",
@@ -180,6 +197,7 @@ RULES: tuple[dict[str, Any], ...] = (
     {
         "id": "ANDROID-NSC-USER-CERTS",
         "pattern": re.compile(r"<certificates\s+[^>]*src\s*=\s*[\"']user[\"']", re.IGNORECASE),
+        "mask_blocks": re.compile(r"<debug-overrides\b.*?</debug-overrides>", re.DOTALL | re.IGNORECASE),
         "severity": "medium",
         "title": "Network Security Config trusts user CAs",
         "summary": "The configuration accepts user-installed certificates; this may be intentional in debug-overrides, but it widens trust in release.",
@@ -199,7 +217,7 @@ RULES: tuple[dict[str, Any], ...] = (
     },
     {
         "id": "ANDROID-WEAK-CIPHER",
-        "pattern": re.compile(r"Cipher\.getInstance\s*\(\s*\"(?:AES|DES|DESede|RC4|ARCFOUR|Blowfish|[^\"]*/ECB/[^\"]*|DES/[^\"]*|DESede/[^\"]*|RC4/[^\"]*)\""),
+        "pattern": re.compile(r"Cipher\.getInstance\s*\(\s*\"(?!RSA/)(?:AES|DES|DESede|RC4|ARCFOUR|Blowfish|[^\"]*/ECB/[^\"]*|DES/[^\"]*|DESede/[^\"]*|RC4/[^\"]*)\""),
         "severity": "medium",
         "title": "Weak cipher algorithm or mode",
         "summary": "DES/3DES/RC4/Blowfish, ECB mode, or \"AES\" without a mode was found (which on many providers defaults to ECB).",
@@ -270,7 +288,7 @@ RULES: tuple[dict[str, Any], ...] = (
     },
     {
         "id": "ANDROID-WEBVIEW-LOADURL-UNTRUSTED",
-        "pattern": re.compile(r"\bloadUrl\s*\([^)\n]{0,200}(?:getStringExtra|getQueryParameter|getDataString|intent\??\.data|\.data\b)"),
+        "pattern": re.compile(r"\bloadUrl\s*\([^)\n]{0,200}(?:getStringExtra|getQueryParameter|getDataString|intent\??\.data(?:String)?\b)"),
         "severity": "medium",
         "title": "WebView loads URL from intent or deep link",
         "summary": "loadUrl receives a value that appears to come from an intent/deep link; without scheme and host validation, another app can choose the loaded content.",
@@ -301,6 +319,7 @@ RULES: tuple[dict[str, Any], ...] = (
     {
         "id": "ANDROID-RELEASE-NOT-MINIFIED",
         "pattern": re.compile(r"\b(?:isMinifyEnabled\s*=\s*false|minifyEnabled\s*(?:=\s*)?false)\b"),
+        "skip_in_blocks": re.compile(r"(?i)\bdebug\b"),
         "severity": "low",
         "title": "Minification/obfuscation disabled",
         "summary": "A build type disables R8/ProGuard; in release this makes reverse engineering easier (confirm the block is release).",
@@ -311,6 +330,7 @@ RULES: tuple[dict[str, Any], ...] = (
     {
         "id": "ANDROID-DEBUG-SIGNING",
         "pattern": re.compile(r"signingConfig\s*(?:=\s*)?signingConfigs\s*\.\s*(?:getByName\s*\(\s*\"debug\"\s*\)|debug\b)"),
+        "skip_in_blocks": re.compile(r"(?i)\bdebug\b"),
         "severity": "medium",
         "title": "Build signed with the debug key",
         "summary": "A build type explicitly uses the debug signingConfig; if it is the release one, the artifact is signed with a well-known public key.",
@@ -702,15 +722,28 @@ def analyze_source_directory(files: dict[str, bytes], profile: str = "aaos") -> 
             continue
         suffix = PurePosixPath(path).suffix.lower()
         source = data.decode("utf-8", errors="replace")
-        for line_number, line in enumerate(source.splitlines(), start=1):
+        for line_number, line in enumerate(mask_comments(source, suffix).splitlines(), start=1):
             for match in AAOS_API_PATTERN.finditer(line):
                 aaos_api_references.add((path, str(line_number), match.group(0)))
             for match in CAR_APP_PATTERN.finditer(line):
                 car_app_references.add((path, str(line_number), match.group(0)))
+        masked = mask_comments(source, suffix)
+        block_index: BlockIndex | None = None
         for rule in RULES:
             if rule.get("suffixes") and suffix not in rule["suffixes"]:
                 continue
-            for match in rule["pattern"].finditer(source):
+            text = source if rule.get("scan_comments") else masked
+            if rule.get("mask_blocks"):
+                text = rule["mask_blocks"].sub(lambda found: "".join(ch if ch in "\r\n" else " " for ch in found.group(0)), text)
+            examined = 0
+            for match in rule["pattern"].finditer(text):
+                examined += 1
+                if examined > MAX_MATCHES_EXAMINED:
+                    break  # a pathological file must not turn context checks into a slowdown
+                if rule.get("skip_in_blocks"):
+                    block_index = block_index or BlockIndex(masked)
+                    if any(rule["skip_in_blocks"].search(header) for header in block_index.headers_at(match.start())):
+                        continue
                 line_number = source.count("\n", 0, match.start()) + 1
                 line_start = source.rfind("\n", 0, match.start()) + 1
                 line_end = source.find("\n", match.start())
