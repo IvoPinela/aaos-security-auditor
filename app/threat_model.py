@@ -18,7 +18,7 @@ THREATS: tuple[dict[str, Any], ...] = (
     {
         "id": "T-IPC", "stride": "Spoofing / Elevation of privilege", "title": "Unauthorized caller uses an exposed component",
         "asset": "Functionality and data behind activities, services, receivers, providers and deep links",
-        "rules": ("ANDROID-EXPORTED-*", "ANDROID-PROVIDER-GRANT-URI", "ANDROID-PENDINGINTENT-MUTABLE", "ANDROID-DYNAMIC-RECEIVER", "ANDROID-SHARED-USER-ID"),
+        "rules": ("ANDROID-EXPORTED-*", "ANDROID-PROVIDER-GRANT-URI", "ANDROID-PENDINGINTENT-MUTABLE", "ANDROID-DYNAMIC-RECEIVER", "ANDROID-SHARED-USER-ID", "AAOS-CAR-APP-*", "AAOS-MEDIA-BROWSER-*", "ANDROID-DEEPLINK-UNVERIFIED"),
         "validation": "Isolated emulator: enumerate exposed components and confirm the intended callers, permissions and input validation using benign data.",
     },
     {
@@ -96,7 +96,7 @@ PHASES: tuple[tuple[str, str, str], ...] = (
 CHECK_PHASE = {
     "PT-SCOPE": "1-scope",
     "PT-DEBUG": "2-static", "PT-PLATFORM": "2-static",
-    "PT-INPUTS": "3-ipc", "PT-EXPORTED": "3-ipc", "PT-EXPORTED-DEFAULT": "3-ipc", "PT-DEEPLINKS": "3-ipc",
+    "PT-INPUTS": "3-ipc", "PT-ENTRYPOINTS": "3-ipc", "PT-APP-LINKS": "3-ipc", "PT-EXPORTED": "3-ipc", "PT-EXPORTED-DEFAULT": "3-ipc", "PT-DEEPLINKS": "3-ipc",
     "PT-PROVIDER": "3-ipc", "PT-WEBVIEW-URL": "3-ipc", "PT-DYNAMIC-CODE": "3-ipc", "PT-SQL": "3-ipc",
     "PT-NETWORK": "4-network", "PT-NSC-TRUST": "4-network", "PT-TLS": "4-network", "PT-TLS-WEBVIEW": "4-network",
     "PT-DATA": "5-data", "PT-BACKUP": "5-data", "PT-FILEPROVIDER": "5-data", "PT-CRYPTO": "5-data", "PT-SECRETS": "5-data",

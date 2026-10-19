@@ -241,3 +241,30 @@ def test_invalid_apk_shows_an_english_error(page: Page) -> None:
     page.click('button[type="submit"]')
     page.wait_for_selector("#error:not([hidden])", timeout=15_000)
     assert "valid APK/ZIP" in page.inner_text("#error")
+
+
+# --- APK upload ---------------------------------------------------------------------------------
+
+def test_apk_upload_flow_with_a_real_binary_manifest(page: Page, tmp_path: Path) -> None:
+    from tests.axml import build_apk
+    from tests.test_real_apk import MANIFEST
+
+    apk = tmp_path / "climate.apk"
+    apk.write_bytes(build_apk(MANIFEST, {"lib/arm64-v8a/libvehicle.so": b"binary"}))
+    page.set_input_files("#apk-file", str(apk))
+    page.check('input[name="authorized"]')
+    page.click('button[type="submit"]')
+    page.wait_for_selector("#results .result-header", timeout=30_000)
+
+    text = page.inner_text("#results")
+    assert "STATIC REPORT" in text and "com.oem.climate" in text and "version 42" in text
+    findings = page.inner_text("#finding-list")
+    assert "Application built in debug mode" in findings and "Plain-text HTTP traffic permitted" in findings
+    assert "Car App service exported: validate the host" in findings
+    # Real exposure only: .OpenService, the web link activity and the provider. Not the launcher, the car service or the guarded service.
+    assert findings.count("Component exported without permission") == 3
+    assert "ANDROID-EXPORTED-UNGUARDED · Evidence: activity .MainActivity" not in findings
+
+    page.click('details[data-lazy="inventory"] summary')
+    page.wait_for_function("document.querySelector('details[data-lazy=\"inventory\"] .lazy-content').textContent.includes('Native libraries')")
+    assert "libvehicle.so" in page.inner_text('details[data-lazy="inventory"]')

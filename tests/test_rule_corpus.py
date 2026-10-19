@@ -203,6 +203,18 @@ CORPUS: dict[str, dict] = {
         "vulnerable": ["val sessionToken = Random().nextInt().toString()", "String token = Long.toHexString((long) Math.random());", "val nonce = Random().nextLong()"],
         "safe": ["val token = SecureRandom().nextInt()", "val delay = Random().nextInt(100)"],
     },
+    "AAOS-CAR-APP-ALLOW-ALL-HOSTS": {
+        "file": KT,
+        "vulnerable": [
+            "override fun createHostValidator() = HostValidator.ALLOW_ALL_HOSTS_VALIDATOR",
+            "return HostValidator.ALLOW_ALL_HOSTS_VALIDATOR;",
+        ],
+        "safe": [
+            "override fun createHostValidator() = HostValidator.Builder(applicationContext).addAllowedHosts(R.array.hosts).build()",
+            "// HostValidator.ALLOW_ALL_HOSTS_VALIDATOR is only for tests",
+            "if (BuildConfig.DEBUG) {\n    return HostValidator.ALLOW_ALL_HOSTS_VALIDATOR\n}",
+        ],
+    },
     "ANDROID-GRADLE-INSECURE-REPO": {
         "file": GRADLE,
         "vulnerable": [

@@ -13,6 +13,13 @@ from typing import Any
 
 from androguard.core.apk import APK
 
+try:  # Androguard logs thousands of DEBUG lines per APK through loguru; they only add noise and expose internals.
+    from loguru import logger as _loguru
+
+    _loguru.disable("androguard")
+except ImportError:  # pragma: no cover - loguru ships with androguard
+    pass
+
 from app.directory_scanner import (
     data_egress_finding,
     data_egress_signals,
@@ -20,6 +27,7 @@ from app.directory_scanner import (
     privileged_car_permissions,
 )
 from app.car_permissions import classify_car_permissions
+from app.entry_points import FilterInfo, component_role, role_finding, unverified_link_finding, unverified_web_link_hosts
 from app.masvs import enrich_findings, masvs_summary
 
 ANDROID_NS = "http://schemas.android.com/apk/res/android"
@@ -49,6 +57,21 @@ def _android_attr(element: Any, name: str) -> str | None:
 
 def _tag_name(element: Any) -> str:
     return str(element.tag).rsplit("}", 1)[-1]
+
+
+def _filter_infos(intent_filters: list[Any]) -> list[FilterInfo]:
+    """Describe <intent-filter> nodes for the entry point checks."""
+    infos = []
+    for intent_filter in intent_filters:
+        data_nodes = [child for child in intent_filter if _tag_name(child) == "data"]
+        infos.append(FilterInfo(
+            actions={_android_attr(child, "name") or "" for child in intent_filter if _tag_name(child) == "action"},
+            categories={_android_attr(child, "name") or "" for child in intent_filter if _tag_name(child) == "category"},
+            schemes={_android_attr(node, "scheme") or "" for node in data_nodes},
+            hosts={_android_attr(node, "host") or "" for node in data_nodes} - {""},
+            auto_verify=(_android_attr(intent_filter, "autoVerify") or "").lower() == "true",
+        ))
+    return infos
 
 
 def analyze_apk(data: bytes) -> dict[str, Any]:
@@ -164,6 +187,7 @@ def analyze_apk(data: bytes) -> dict[str, Any]:
                 "type": component_type,
                 "exported": exported_value if exported_value is not None else ("inferred_true" if inferred_exported else "unspecified"),
                 "permission": component_permission or "",
+                "role": component_role(_filter_infos(intent_filters)) or "",
             })
             if exported_value is None and has_intent_filter and requires_explicit_export:
                 target_requires_explicit_export = bool(target_sdk and target_sdk.isdigit() and int(target_sdk) >= 31)
@@ -176,7 +200,7 @@ def analyze_apk(data: bytes) -> dict[str, Any]:
                         else " Confirm the effective behavior for the target SDK and system concerned."
                     ),
                     "Declare android:exported explicitly, confirm the intended callers, and protect sensitive operations.",
-                    f"{component_type} {component_name}: intent-filter presente; android:exported ausente",
+                    f"{component_type} {component_name}: intent-filter present; android:exported missing",
                 ))
             if (
                 component_type == "provider"
@@ -189,7 +213,23 @@ def analyze_apk(data: bytes) -> dict[str, Any]:
                     "Make the provider non-exported, restrict it with <grant-uri-permission> to specific paths, and validate the URIs received.",
                     f"provider {component_name}: exported=true, grantUriPermissions=true",
                 ))
-            if inferred_exported and not component_permission:
+            filter_infos = _filter_infos(intent_filters)
+            role = component_role(filter_infos)
+            if role and (exported_value or "").lower() != "false":
+                review_point = role_finding(role, component_type, component_name)
+                if review_point:
+                    findings.append(Finding(
+                        review_point["rule_id"], review_point["title"], review_point["severity"],
+                        review_point["summary"], review_point["recommendation"], f"{component_type} {component_name}",
+                    ))
+            unverified_hosts = unverified_web_link_hosts(filter_infos)
+            if unverified_hosts:
+                link = unverified_link_finding(component_type, component_name, unverified_hosts)
+                findings.append(Finding(
+                    link["rule_id"], link["title"], link["severity"], link["summary"], link["recommendation"],
+                    f"{component_type} {component_name}: {', '.join(unverified_hosts[:4])}",
+                ))
+            if inferred_exported and not component_permission and not role:
                 if exported_value is None:
                     implicit_reason = (
                         "has an intent-filter and may be implicitly exported"

@@ -18,6 +18,7 @@ from app.car_permissions import (
     is_third_party_grantable,
     protection_level,
 )
+from app.entry_points import FilterInfo, component_role, role_finding, unverified_link_finding, unverified_web_link_hosts
 from app.masvs import enrich_findings, masvs_summary
 from app.sbom import dependency_summary, parse_gradle_dependencies
 from app.source_mask import BlockIndex, mask_comments
@@ -318,6 +319,17 @@ RULES: tuple[dict[str, Any], ...] = (
         "suffixes": {".kt", ".java"},
     },
     {
+        "id": "AAOS-CAR-APP-ALLOW-ALL-HOSTS",
+        "pattern": re.compile(r"\bALLOW_ALL_HOSTS_VALIDATOR\b"),
+        "skip_in_blocks": re.compile(r"(?i)\bBuildConfig\.DEBUG\b|\bisDebug(?:gable)?\b"),
+        "severity": "high",
+        "title": "Car App host validation disabled",
+        "summary": "ALLOW_ALL_HOSTS_VALIDATOR accepts any app as the Car App host. The service is exported so the host can bind, so this removes the only access control and lets another app drive the car app session.",
+        "recommendation": "Use HostValidator.Builder with an allow-list of trusted host package names and signatures; keep the allow-all validator for debug builds only.",
+        "profile": "AAOS vehicle APIs",
+        "suffixes": {".java", ".kt"},
+    },
+    {
         "id": "ANDROID-GRADLE-INSECURE-REPO",
         "pattern": re.compile(
             r"(?:\burl\s*(?:=\s*)?(?:uri\s*\(\s*)?|\bmaven\s*\(\s*)[\"']http://(?!(?:localhost|127\.0\.0\.1|10\.0\.2\.2)\b)"
@@ -476,6 +488,21 @@ def _module_key(path: str) -> str:
     return parsed.parent.as_posix() or "."
 
 
+def _filter_infos(filters: list[Any]) -> list[FilterInfo]:
+    """Describe <intent-filter> elements for the entry point checks."""
+    infos = []
+    for intent_filter in filters:
+        data = intent_filter.findall("data")
+        infos.append(FilterInfo(
+            actions={element.get(f"{{{ANDROID_NS}}}name") or "" for element in intent_filter.findall("action")},
+            categories={element.get(f"{{{ANDROID_NS}}}name") or "" for element in intent_filter.findall("category")},
+            schemes={element.get(f"{{{ANDROID_NS}}}scheme") or "" for element in data},
+            hosts={element.get(f"{{{ANDROID_NS}}}host") or "" for element in data} - {""},
+            auto_verify=(intent_filter.get(f"{{{ANDROID_NS}}}autoVerify") or "").lower() == "true",
+        ))
+    return infos
+
+
 def _inspect_manifest(path: str, source: str, *, include_aaos: bool) -> tuple[list[dict[str, str]], dict[str, Any]]:
     findings: list[dict[str, str]] = []
     metadata: dict[str, Any] = {
@@ -556,6 +583,7 @@ def _inspect_manifest(path: str, source: str, *, include_aaos: bool) -> tuple[li
             "type": component_type,
             "exported": exported if exported is not None else ("inferred_true" if inferred else "unspecified"),
             "permission": component.get(f"{{{ANDROID_NS}}}permission", ""),
+            "role": component_role(_filter_infos(filters)) or "",
         })
         for intent_filter in filters:
             actions = {element.get(f"{{{ANDROID_NS}}}name") for element in intent_filter.findall("action")}
@@ -655,7 +683,19 @@ def _inspect_manifest(path: str, source: str, *, include_aaos: bool) -> tuple[li
                     "line": "1",
                     "profile": "Manifest and AAOS",
                 })
-            if inferred_exported and not component_permission:
+            filter_infos = _filter_infos(filters)
+            role = component_role(filter_infos)
+            if role and include_aaos and (exported or "").lower() != "false":
+                review_point = role_finding(role, component_type, component_name)
+                if review_point:
+                    findings.append({**review_point, "evidence": f"{path}: component {component_name}", "source_path": path, "line": "1", "profile": "Manifest and AAOS"})
+            unverified_hosts = unverified_web_link_hosts(filter_infos)
+            if unverified_hosts:
+                findings.append({
+                    **unverified_link_finding(component_type, component_name, unverified_hosts),
+                    "evidence": f"{path}: component {component_name}", "source_path": path, "line": "1", "profile": "Manifest and AAOS",
+                })
+            if inferred_exported and not component_permission and not role:
                 findings.append({
                     "rule_id": "ANDROID-EXPORTED-UNGUARDED",
                     "title": "Component potentially exported without effective permission",

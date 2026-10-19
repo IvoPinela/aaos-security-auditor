@@ -497,5 +497,48 @@
       "CWE-1357"
     ],
     "content": "A repository declared with http:// (or allowInsecureProtocol = true) lets anyone on the network path replace an artifact, which puts attacker-controlled code into the build and then into the app and, on AAOS, into a vehicle image. This is a build-time supply chain risk, so fix it even when the app never talks to that host at runtime. Use https repositories, remove the insecure flag, and enable Gradle dependency verification (checksums or signatures). Local repositories on localhost or the emulator host are the usual legitimate exception; confirm they are not used in release builds. Dynamic versions (+, ranges, latest.release, SNAPSHOT) make builds non-reproducible and pull in a new, possibly compromised release without review. Pin exact versions, prefer a version catalog, use dependency locking, and update on purpose. The declared dependency inventory and CycloneDX SBOM are derived from build files only: transitive dependencies and BOM-managed versions are not resolved, so run OSV-Scanner or Trivy on the resolved graph for CVEs."
+  },
+  {
+    "id": "aaos-car-app-host-validation",
+    "title": "Car App Library host validation",
+    "rule_ids": [
+      "AAOS-CAR-APP-HOST-VALIDATION",
+      "AAOS-CAR-APP-ALLOW-ALL-HOSTS"
+    ],
+    "masvs": [
+      "MASVS-PLATFORM-1"
+    ],
+    "cwe": [
+      "CWE-940"
+    ],
+    "content": "A CarAppService must be exported because the host (Android Auto or the AAOS car UI) binds to it, so the manifest cannot restrict who connects. The Car App Library therefore moves access control into code: createHostValidator must return a HostValidator that allow-lists trusted host package names and signing certificate digests. HostValidator.ALLOW_ALL_HOSTS_VALIDATOR accepts every caller and is meant for debug and testing only; shipping it lets any installed app impersonate the host and drive the session, which can reach navigation, messaging and templates. Recommend an explicit allow-list built from the host signatures documented for each target platform, a debug-only allow-all behind BuildConfig.DEBUG, and a release test that rejects an unknown host. A finding in debug-only code is expected; confirm it cannot reach a release variant. The informational manifest finding is a review point, not a vulnerability."
+  },
+  {
+    "id": "aaos-media-browser-caller-validation",
+    "title": "Media browser and session services",
+    "rule_ids": [
+      "AAOS-MEDIA-BROWSER-CALLER-VALIDATION"
+    ],
+    "masvs": [
+      "MASVS-PLATFORM-1"
+    ],
+    "cwe": [
+      "CWE-940"
+    ],
+    "content": "Media apps in a car export a MediaBrowserService, MediaBrowserServiceCompat or Media3 session service so the car UI, assistants and other controllers can connect. Like the Car App service, the manifest cannot restrict callers: the service decides in onGetRoot (or the session connect callback) by looking at the calling package and uid. Recommend allow-listing known controllers by package name and signing certificate, returning an empty or limited browse tree to unknown callers, and never exposing account data, playback history or personalized content to unverified clients. The informational finding is a review point; it does not mean the service is unprotected."
+  },
+  {
+    "id": "deep-link-verification",
+    "title": "App Links verification",
+    "rule_ids": [
+      "ANDROID-DEEPLINK-UNVERIFIED"
+    ],
+    "masvs": [
+      "MASVS-PLATFORM-1"
+    ],
+    "cwe": [
+      "CWE-939"
+    ],
+    "content": "A browsable http(s) intent filter without android:autoVerify is a plain deep link: the system may show a chooser and another app can declare the same filter and receive the link and its data. Verified App Links bind the host to the app through /.well-known/assetlinks.json and open the app directly. Recommend autoVerify on every web filter, a published assetlinks.json for each host with the release signing certificate, and no tokens, session identifiers or personal data in link parameters. Custom-scheme links (myapp://) cannot be verified at all, so treat their input as untrusted. Confirm the verification state on an emulator with adb shell pm get-app-links, because the manifest alone does not prove the assetlinks file is correct."
   }
 ]
