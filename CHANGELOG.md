@@ -5,6 +5,8 @@ All notable changes are documented here. The format follows [Keep a Changelog](h
 ## [0.4.0] - 2026-10-19
 
 ### Added
+- **MASWE weakness IDs** on findings, the rule catalog, SARIF tags, Markdown and HTML reports (46 app rules mapped). IDs and
+  titles come from the official OWASP MAS list and a test rejects any ID outside it; platform rules stay unmapped on purpose.
 - **GitHub Action** (`action.yml`): one-line use in other repositories, with SARIF upload, a severity gate, baselines,
   imports, and outputs for every report.
 - **CycloneDX SBOM** (`--format sbom`, `POST /api/export/sbom`) from declared Gradle dependencies, including version

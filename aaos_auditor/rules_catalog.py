@@ -6,7 +6,7 @@ from typing import Any
 
 from aaos_auditor.directory_scanner import RULES
 from aaos_auditor.platform_scanner import PLATFORM_RULES
-from aaos_auditor.masvs import cwe_for_rule, masvs_for_rule
+from aaos_auditor.masvs import cwe_for_rule, masvs_for_rule, maswe_for_rule
 
 # Rules emitted by manifest/APK/Gradle logic rather than the regex table in directory_scanner.RULES.
 STRUCTURAL_RULES: tuple[dict[str, str], ...] = (
@@ -62,6 +62,7 @@ def rule_catalog() -> list[dict[str, Any]]:
     for entry in catalog.values():
         entry["masvs"] = masvs_for_rule(entry["id"])
         entry["cwe"] = cwe_for_rule(entry["id"])
+        entry["maswe"] = maswe_for_rule(entry["id"])
     return [catalog[rule_id] for rule_id in sorted(catalog)]
 
 

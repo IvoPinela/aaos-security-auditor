@@ -95,7 +95,7 @@ def to_html(report: dict[str, Any], generated_by: str = "AAOS Security Auditor")
     if not findings:
         parts.append('<div class="card">No findings from the rules that ran. This does not prove the application is secure.</div>')
     for item in findings:
-        tags = ", ".join(item.get("masvs") or []) + (" · " + ", ".join(item.get("cwe") or []) if item.get("cwe") else "")
+        tags = ", ".join([*(item.get("masvs") or []), *(item.get("maswe") or [])]) + (" · " + ", ".join(item.get("cwe") or []) if item.get("cwe") else "")
         parts.append(
             f'<div class="card finding {_e(item.get("severity", "info"))}">'
             f'{_badge(item.get("severity"))} <b>{_e(item.get("title", ""))}</b>'

@@ -46,7 +46,7 @@ Generic mobile scanners know nothing about that chain. This tool does: it flags 
 | 🔎 **89 deterministic rules** (60 for apps, 29 for the platform image) | Manifest, network, WebView, IPC, storage, crypto, secrets, build, supply chain and AAOS checks. Comment-aware, with a vulnerable-and-safe test corpus per rule. Evidence is always `path:line`, never code or secret values |
 | 🚘 **AAOS-aware profile** | Automotive feature declaration, privileged `android.car` permissions, vehicle API references, Car App Library, vehicle-data egress review |
 | 🖥️ **Platform profile** | Reviews the OS image sources: build properties and signing, SELinux, init scripts, privileged permissions and Soong. Debuggable images, test keys, permissive domains and over-privileged system apps |
-| 🧭 **MASVS + CWE on every finding** | Triage by standard, with a per-control summary in each report |
+| 🧭 **MASVS, MASWE + CWE on every finding** | Triage by standard, with a per-control summary in each report |
 | 🧩 **7 scanner connectors** | Merge Semgrep, SARIF/CodeQL, Gitleaks, OSV-Scanner, Trivy, MobSF and Android Lint into one report |
 | 🛡️ **Derived threat model** | Attack surface, STRIDE threats and a 7-phase manual validation plan |
 | 🤖 **AI-ready by default** | A sanitized Markdown briefing for Claude or any assistant, hardened against prompt injection |
@@ -208,7 +208,8 @@ Pentesting here means **structured, authorized, manual validation guided by stat
 | Scanner fusion and dependency CVEs | ✅ Available | Semgrep, CodeQL, Gitleaks, OSV, Trivy, Lint, MobSF |
 | Platform image review (build properties, SELinux, init, privapp) | ✅ Available | Static review of AAOS image sources, with a bench-only validation phase |
 | AI triage and remediation skills | ✅ Available | Claude Code skills with evaluation cases |
-| Per-rule MASTG test and MASWE weakness IDs | 🔜 Next | Needs verification against official sources |
+| Per-rule MASWE weakness IDs | ✅ Available | 46 rules mapped; IDs checked against the official OWASP MAS list |
+| Per-rule MASTG test IDs | 🔜 Next | Needs verification against official sources |
 | Emulator lab for dynamic checks (opt-in, isolated) | 🧭 Planned | Separate stage, AAOS emulator only |
 | Authentication, audit log, rate limits | 🧭 Planned | Required before any shared deployment |
 

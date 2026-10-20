@@ -138,6 +138,82 @@ RULE_CWE: dict[str, tuple[str, ...]] = {
     "ANDROID-DEPENDENCY-DYNAMIC-VERSION": ("CWE-1357",),
 }
 
+# MASWE (OWASP MAS weakness enumeration) titles, copied from https://mas.owasp.org/MASWE/ (retrieved 2026-10-20).
+# Only weaknesses that at least one rule maps to are listed; tests reject any ID that is not in this table.
+MASWE_TITLES: dict[str, str] = {
+    "MASWE-0001": "Sensitive Data Stored Unencrypted in Private Storage",
+    "MASWE-0002": "Sensitive Data Stored Unencrypted Outside of Private Storage",
+    "MASWE-0004": "Sensitive Data Hardcoded in the App Package",
+    "MASWE-0005": "Insertion of Sensitive Data into Logs",
+    "MASWE-0006": "Sensitive Data Not Excluded From Backup",
+    "MASWE-0007": "Improper Encryption",
+    "MASWE-0008": "Improper Hashing",
+    "MASWE-0012": "Improper Random Number Generation",
+    "MASWE-0018": "Lack of Authentication or Authorization on App Components",
+    "MASWE-0026": "Network Traffic Not Encrypted",
+    "MASWE-0027": "Insecure Certificate Validation",
+    "MASWE-0029": "Insecure Deep Links",
+    "MASWE-0032": "Insecure Intents",
+    "MASWE-0033": "Sensitive Native Functionality Exposed in WebViews",
+    "MASWE-0034": "WebViews Allow Access to Local Resources with Untrusted Content",
+    "MASWE-0035": "WebViews Loading Untrusted Content",
+    "MASWE-0039": "App Vulnerable to Overlay Attacks",
+    "MASWE-0042": "Latest Platform Version Not Targeted",
+    "MASWE-0049": "Unsafe Dynamic Code Loading",
+    "MASWE-0050": "Unsafe Handling of Untrusted Data",
+    "MASWE-0059": "Code Obfuscation Not Implemented",
+    "MASWE-0061": "Debug Artifacts Not Removed",
+    "MASWE-0063": "Debug Mechanisms Not Disabled",
+    "MASWE-0066": "Inadequate Permission Management",
+}
+
+# Each mapping follows the weakness title; rules with no clear counterpart are left unmapped on purpose.
+RULE_MASWE: dict[str, tuple[str, ...]] = {
+    "ANDROID-DEBUGGABLE": ("MASWE-0063",),
+    "ANDROID-TEST-ONLY": ("MASWE-0063",),
+    "ANDROID-WEBVIEW-DEBUG": ("MASWE-0063",),
+    "ANDROID-DEBUG-SIGNING": ("MASWE-0061",),
+    "ANDROID-CLEARTEXT": ("MASWE-0026",),
+    "AAOS-CLEARTEXT": ("MASWE-0026",),
+    "ANDROID-NSC-CLEARTEXT": ("MASWE-0026",),
+    "ANDROID-HTTP-URL": ("MASWE-0026",),
+    "ANDROID-GRADLE-INSECURE-REPO": ("MASWE-0026",),
+    "ANDROID-NSC-USER-CERTS": ("MASWE-0027",),
+    "ANDROID-TRUST-ALL-CERTS": ("MASWE-0027",),
+    "ANDROID-WEBVIEW-SSL-PROCEED": ("MASWE-0027",),
+    "ANDROID-BACKUP-ENABLED": ("MASWE-0006",),
+    "ANDROID-WORLD-READABLE": ("MASWE-0002",),
+    "ANDROID-EXTERNAL-STORAGE": ("MASWE-0002",),
+    "ANDROID-SECRET-LITERAL": ("MASWE-0004",),
+    "ANDROID-KNOWN-SECRET-FORMAT": ("MASWE-0004",),
+    "ANDROID-LOG-SENSITIVE": ("MASWE-0005",),
+    "ANDROID-PREFS-SENSITIVE": ("MASWE-0001",),
+    "ANDROID-WEAK-CIPHER": ("MASWE-0007",),
+    "ANDROID-STATIC-IV": ("MASWE-0007",),
+    "ANDROID-WEAK-HASH": ("MASWE-0008",),
+    "ANDROID-INSECURE-RANDOM": ("MASWE-0012",),
+    "ANDROID-SQL-CONCAT": ("MASWE-0050",),
+    "ANDROID-RUNTIME-EXEC": ("MASWE-0050",),
+    "ANDROID-DYNAMIC-CODE-LOADING": ("MASWE-0049",),
+    "ANDROID-WEBVIEW-JS-BRIDGE": ("MASWE-0033",),
+    "ANDROID-WEBVIEW-FILE-ACCESS": ("MASWE-0034",),
+    "ANDROID-WEBVIEW-UNIVERSAL-FILE": ("MASWE-0034",),
+    "ANDROID-WEBVIEW-LOADURL-UNTRUSTED": ("MASWE-0035",),
+    "ANDROID-EXPORTED-UNGUARDED": ("MASWE-0018",),
+    "ANDROID-EXPORTED-IMPLICIT": ("MASWE-0018",),
+    "AAOS-CAR-APP-ALLOW-ALL-HOSTS": ("MASWE-0018",),
+    "AAOS-CAR-APP-HOST-VALIDATION": ("MASWE-0018",),
+    "AAOS-MEDIA-BROWSER-CALLER-VALIDATION": ("MASWE-0018",),
+    "ANDROID-PENDINGINTENT-MUTABLE": ("MASWE-0032",),
+    "ANDROID-DYNAMIC-RECEIVER": ("MASWE-0032",),
+    "ANDROID-DEEPLINK-UNVERIFIED": ("MASWE-0029",),
+    "ANDROID-PERM-SYSTEM_ALERT_WINDOW": ("MASWE-0039", "MASWE-0066"),
+    "ANDROID-PERM-*": ("MASWE-0066",),
+    "AAOS-PRIVILEGED-CAR-PERMISSION": ("MASWE-0066",),
+    "ANDROID-OLD-TARGET-SDK": ("MASWE-0042",),
+    "ANDROID-RELEASE-NOT-MINIFIED": ("MASWE-0059",),
+}
+
 # Used for findings imported from external scanners, which report CWE but not our rule IDs.
 CWE_MASVS: dict[str, tuple[str, ...]] = {
     "CWE-319": ("MASVS-NETWORK-1",), "CWE-295": ("MASVS-NETWORK-1",), "CWE-297": ("MASVS-NETWORK-1",),
@@ -177,6 +253,17 @@ def cwe_for_rule(rule_id: str) -> list[str]:
     return []
 
 
+def maswe_for_rule(rule_id: str) -> list[str]:
+    """Return MASWE weakness IDs for a rule (exact match first, then glob families)."""
+    exact = RULE_MASWE.get(rule_id)
+    if exact is not None:
+        return list(exact)
+    for pattern, weaknesses in RULE_MASWE.items():
+        if "*" in pattern and fnmatchcase(rule_id, pattern):
+            return list(weaknesses)
+    return []
+
+
 def masvs_for_cwe(cwes: list[str]) -> list[str]:
     """Map CWE ids (from external scanners) to MASVS controls, preserving order without duplicates."""
     controls: list[str] = []
@@ -199,6 +286,7 @@ def enrich_findings(findings: list[dict[str, Any]]) -> list[dict[str, Any]]:
         # MASVS describes mobile apps, so platform findings carry CWE only; imported findings derive MASVS from their CWE.
         derived = [] if rule_id.startswith("PLATFORM-") else masvs_for_cwe(list(finding.get("cwe") or []))
         finding.setdefault("masvs", masvs_for_rule(rule_id) or derived)
+        finding.setdefault("maswe", maswe_for_rule(rule_id))
     assign_fingerprints(findings)
     return findings
 
