@@ -77,6 +77,7 @@ def to_sarif(report: dict[str, Any], tool_version: str = __version__) -> dict[st
         masvs = entry.get("masvs") or sample.get("masvs") or []
         cwe = entry.get("cwe") or sample.get("cwe") or []
         maswe = entry.get("maswe") or sample.get("maswe") or []
+        mastg = entry.get("mastg") or sample.get("mastg") or []
         cwe_tags = [f"external/cwe/cwe-{str(item).split('-')[-1]}" for item in cwe if str(item).upper().startswith("CWE-")]
         rules.append({
             "id": rule_id,
@@ -86,7 +87,7 @@ def to_sarif(report: dict[str, Any], tool_version: str = __version__) -> dict[st
             "help": {"text": str(entry.get("recommendation") or sample.get("recommendation", ""))},
             "defaultConfiguration": {"level": SARIF_LEVEL.get(severity, "note")},
             "properties": {
-                "tags": ["security", *masvs, *maswe, *cwe_tags],
+                "tags": ["security", *masvs, *maswe, *mastg, *cwe_tags],
                 "security-severity": SECURITY_SEVERITY.get(severity, "1.0"),
                 "profile": str(entry.get("profile") or sample.get("profile", "")),
             },
@@ -100,7 +101,7 @@ def to_sarif(report: dict[str, Any], tool_version: str = __version__) -> dict[st
             "ruleIndex": rule_index[str(finding.get("rule_id", ""))],
             "level": SARIF_LEVEL.get(severity, "note"),
             "message": {"text": f"{finding.get('title', '')}: {finding.get('summary', '')}".strip(": ")},
-            "properties": {"severity": severity, "masvs": finding.get("masvs", []), "maswe": finding.get("maswe", []), "cwe": finding.get("cwe", [])},
+            "properties": {"severity": severity, "masvs": finding.get("masvs", []), "maswe": finding.get("maswe", []), "mastg": finding.get("mastg", []), "cwe": finding.get("cwe", [])},
         }
         decision = finding.get("suppression")
         if isinstance(decision, dict):
@@ -178,11 +179,11 @@ def to_markdown(report: dict[str, Any]) -> str:
         ]
     lines += ["## Findings", ""]
     if findings:
-        lines += ["| Severity | Rule | Title | Evidence | MASVS | MASWE | CWE |", "|---|---|---|---|---|---|---|"]
+        lines += ["| Severity | Rule | Title | Evidence | MASVS | MASWE | MASTG | CWE |", "|---|---|---|---|---|---|---|---|"]
         for finding in findings:
             lines.append(
                 f"| {_md(finding.get('severity', ''))} | `{_md(finding.get('rule_id', ''))}` | {_md(finding.get('title', ''))} "
-                f"| {_md(finding.get('evidence', ''))} | {_md(', '.join(finding.get('masvs', [])))} | {_md(', '.join(finding.get('maswe', [])))} | {_md(', '.join(finding.get('cwe', [])))} |"
+                f"| {_md(finding.get('evidence', ''))} | {_md(', '.join(finding.get('masvs', [])))} | {_md(', '.join(finding.get('maswe', [])))} | {_md(', '.join(finding.get('mastg', [])))} | {_md(', '.join(finding.get('cwe', [])))} |"
             )
         lines += ["", "### Recommendations", ""]
         seen: set[str] = set()

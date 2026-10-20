@@ -5,6 +5,8 @@ All notable changes are documented here. The format follows [Keep a Changelog](h
 ## [0.4.0] - 2026-10-19
 
 ### Added
+- **MASTG test IDs** on findings, the catalog, SARIF tags and Markdown/HTML reports (30 rules mapped to the static
+  tests that confirm them). Titles come from the official OWASP MASTG list and a test rejects unknown IDs.
 - **MASWE weakness IDs** on findings, the rule catalog, SARIF tags, Markdown and HTML reports (46 app rules mapped). IDs and
   titles come from the official OWASP MAS list and a test rejects any ID outside it; platform rules stay unmapped on purpose.
 - **GitHub Action** (`action.yml`): one-line use in other repositories, with SARIF upload, a severity gate, baselines,

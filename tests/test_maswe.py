@@ -1,7 +1,7 @@
 """MASWE mapping: every ID must exist in the verified table, and reports must carry it."""
 
 from aaos_auditor.exporters import to_markdown, to_sarif
-from aaos_auditor.masvs import MASWE_TITLES, RULE_MASWE, enrich_findings, maswe_for_rule
+from aaos_auditor.masvs import MASTG_TITLES, MASWE_TITLES, RULE_MASTG, RULE_MASWE, enrich_findings, maswe_for_rule
 from aaos_auditor.rules_catalog import known_rule_ids, rule_catalog
 
 
@@ -38,3 +38,22 @@ def test_findings_catalog_and_exports_carry_maswe():
     sarif = to_sarif(report)
     assert "MASWE-0006" in sarif["runs"][0]["tool"]["driver"]["rules"][0]["properties"]["tags"]
     assert "MASWE-0006" in to_markdown(report)
+
+
+def test_mastg_ids_are_in_the_verified_table_and_rules_exist():
+    ids = known_rule_ids()
+    for rule_id, tests in RULE_MASTG.items():
+        assert rule_id in ids, rule_id
+        for test in tests:
+            assert test in MASTG_TITLES, (rule_id, test)
+    assert all(key.startswith("MASTG-TEST-") and len(key) == 15 for key in MASTG_TITLES)
+    assert all(any(key in tests for tests in RULE_MASTG.values()) for key in MASTG_TITLES)
+
+
+def test_mastg_reaches_findings_catalog_and_reports():
+    findings = enrich_findings([{"rule_id": "ANDROID-DEBUGGABLE", "title": "t", "severity": "high",
+                                 "summary": "s", "recommendation": "r", "evidence": "AndroidManifest.xml:3"}])
+    assert findings[0]["mastg"] == ["MASTG-TEST-0226"]
+    report = {"project_name": "p", "findings": findings, "severity_counts": {}, "risk_level": "high", "report_type": "source_directory"}
+    assert "MASTG-TEST-0226" in to_markdown(report)
+    assert "MASTG-TEST-0226" in to_sarif(report)["runs"][0]["tool"]["driver"]["rules"][0]["properties"]["tags"]

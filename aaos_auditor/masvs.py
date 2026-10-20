@@ -214,6 +214,70 @@ RULE_MASWE: dict[str, tuple[str, ...]] = {
     "ANDROID-RELEASE-NOT-MINIFIED": ("MASWE-0059",),
 }
 
+# MASTG test titles, copied from https://mas.owasp.org/MASTG/tests/ (retrieved 2026-10-20). Tests are the manual or
+# tool-assisted procedures that confirm a finding; a test is listed here only if a rule maps to it.
+MASTG_TITLES: dict[str, str] = {
+    "MASTG-TEST-0025": "Testing for Injection Flaws",
+    "MASTG-TEST-0027": "Testing for URL Loading in WebViews",
+    "MASTG-TEST-0029": "Testing for Sensitive Functionality Exposure Through IPC",
+    "MASTG-TEST-0031": "Testing JavaScript Execution in WebViews",
+    "MASTG-TEST-0033": "Testing for Java Objects Exposed Through WebViews",
+    "MASTG-TEST-0035": "Testing for Overlay Attacks",
+    "MASTG-TEST-0038": "Making Sure that the App is Properly Signed",
+    "MASTG-TEST-0051": "Testing Obfuscation",
+    "MASTG-TEST-0202": "References to APIs and Permissions for Accessing External Storage",
+    "MASTG-TEST-0204": "Insecure Random API Usage",
+    "MASTG-TEST-0221": "Broken Symmetric Encryption Algorithms",
+    "MASTG-TEST-0226": "Debuggable Flag Enabled in the AndroidManifest",
+    "MASTG-TEST-0227": "Debugging Enabled for WebViews",
+    "MASTG-TEST-0231": "References to Logging APIs",
+    "MASTG-TEST-0233": "Hardcoded HTTP URLs",
+    "MASTG-TEST-0235": "Android App Configurations Allowing Cleartext Traffic",
+    "MASTG-TEST-0252": "References to Local File Access in WebViews",
+    "MASTG-TEST-0254": "Dangerous App Permissions",
+    "MASTG-TEST-0262": "References to Backup Configurations Not Excluding Sensitive Data",
+    "MASTG-TEST-0282": "Unsafe Custom Trust Evaluation",
+    "MASTG-TEST-0284": "Incorrect SSL Error Handling in WebViews",
+    "MASTG-TEST-0286": "Network Security Configuration Allowing Trust in User-Provided CAs",
+    "MASTG-TEST-0309": "References to Reused Initialization Vectors in Symmetric Encryption",
+    "MASTG-TEST-0381": "References to Insecure PendingIntent Creation",
+    "MASTG-TEST-0393": "Use of Unverified App Links",
+}
+
+# Static counterparts only (configuration and reference checks); rules with no matching official test stay unmapped.
+RULE_MASTG: dict[str, tuple[str, ...]] = {
+    "ANDROID-DEBUGGABLE": ("MASTG-TEST-0226",),
+    "ANDROID-WEBVIEW-DEBUG": ("MASTG-TEST-0227",),
+    "ANDROID-DEBUG-SIGNING": ("MASTG-TEST-0038",),
+    "ANDROID-CLEARTEXT": ("MASTG-TEST-0235",),
+    "AAOS-CLEARTEXT": ("MASTG-TEST-0235",),
+    "ANDROID-NSC-CLEARTEXT": ("MASTG-TEST-0235",),
+    "ANDROID-HTTP-URL": ("MASTG-TEST-0233",),
+    "ANDROID-NSC-USER-CERTS": ("MASTG-TEST-0286",),
+    "ANDROID-TRUST-ALL-CERTS": ("MASTG-TEST-0282",),
+    "ANDROID-WEBVIEW-SSL-PROCEED": ("MASTG-TEST-0284",),
+    "ANDROID-BACKUP-ENABLED": ("MASTG-TEST-0262",),
+    "ANDROID-EXTERNAL-STORAGE": ("MASTG-TEST-0202",),
+    "ANDROID-LOG-SENSITIVE": ("MASTG-TEST-0231",),
+    "ANDROID-WEAK-CIPHER": ("MASTG-TEST-0221",),
+    "ANDROID-STATIC-IV": ("MASTG-TEST-0309",),
+    "ANDROID-INSECURE-RANDOM": ("MASTG-TEST-0204",),
+    "ANDROID-WEBVIEW-JS": ("MASTG-TEST-0031",),
+    "ANDROID-WEBVIEW-JS-BRIDGE": ("MASTG-TEST-0033",),
+    "ANDROID-WEBVIEW-FILE-ACCESS": ("MASTG-TEST-0252",),
+    "ANDROID-WEBVIEW-UNIVERSAL-FILE": ("MASTG-TEST-0252",),
+    "ANDROID-WEBVIEW-LOADURL-UNTRUSTED": ("MASTG-TEST-0027",),
+    "ANDROID-PENDINGINTENT-MUTABLE": ("MASTG-TEST-0381",),
+    "ANDROID-EXPORTED-UNGUARDED": ("MASTG-TEST-0029",),
+    "ANDROID-EXPORTED-IMPLICIT": ("MASTG-TEST-0029",),
+    "ANDROID-DEEPLINK-UNVERIFIED": ("MASTG-TEST-0393",),
+    "ANDROID-PERM-RECORD_AUDIO": ("MASTG-TEST-0254",),
+    "ANDROID-PERM-READ_SMS": ("MASTG-TEST-0254",),
+    "ANDROID-PERM-SYSTEM_ALERT_WINDOW": ("MASTG-TEST-0035",),
+    "ANDROID-RELEASE-NOT-MINIFIED": ("MASTG-TEST-0051",),
+    "ANDROID-SQL-CONCAT": ("MASTG-TEST-0025",),
+}
+
 # Used for findings imported from external scanners, which report CWE but not our rule IDs.
 CWE_MASVS: dict[str, tuple[str, ...]] = {
     "CWE-319": ("MASVS-NETWORK-1",), "CWE-295": ("MASVS-NETWORK-1",), "CWE-297": ("MASVS-NETWORK-1",),
@@ -264,6 +328,11 @@ def maswe_for_rule(rule_id: str) -> list[str]:
     return []
 
 
+def mastg_for_rule(rule_id: str) -> list[str]:
+    """Return MASTG test IDs that confirm a rule's finding (exact match only)."""
+    return list(RULE_MASTG.get(rule_id, ()))
+
+
 def masvs_for_cwe(cwes: list[str]) -> list[str]:
     """Map CWE ids (from external scanners) to MASVS controls, preserving order without duplicates."""
     controls: list[str] = []
@@ -287,6 +356,7 @@ def enrich_findings(findings: list[dict[str, Any]]) -> list[dict[str, Any]]:
         derived = [] if rule_id.startswith("PLATFORM-") else masvs_for_cwe(list(finding.get("cwe") or []))
         finding.setdefault("masvs", masvs_for_rule(rule_id) or derived)
         finding.setdefault("maswe", maswe_for_rule(rule_id))
+        finding.setdefault("mastg", mastg_for_rule(rule_id))
     assign_fingerprints(findings)
     return findings
 
