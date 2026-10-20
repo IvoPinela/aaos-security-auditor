@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from aaos_auditor.directory_scanner import RULES
+from aaos_auditor.platform_scanner import PLATFORM_RULES
 from aaos_auditor.masvs import cwe_for_rule, masvs_for_rule
 
 # Rules emitted by manifest/APK/Gradle logic rather than the regex table in directory_scanner.RULES.
@@ -38,6 +39,9 @@ STRUCTURAL_RULES: tuple[dict[str, str], ...] = (
     {"id": "AAOS-CAR-APP-LIBRARY", "severity": "info", "title": "AndroidX Car App Library found", "profile": "AAOS and car app compatibility", "scope": "source"},
     {"id": "AAOS-MANIFEST-MISSING", "severity": "medium", "title": "AndroidManifest.xml not found", "profile": "Manifest and AAOS", "scope": "source"},
 )
+
+
+STRUCTURAL_RULES = STRUCTURAL_RULES + PLATFORM_RULES
 
 
 def rule_catalog() -> list[dict[str, Any]]:

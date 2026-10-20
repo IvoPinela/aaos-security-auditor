@@ -1,0 +1,6 @@
+<permissions>
+  <privapp-permissions package="com.oem.climate">
+    <permission name="android.permission.INSTALL_PACKAGES"/>
+    <permission name="android.car.permission.CONTROL_CAR_CLIMATE"/>
+  </privapp-permissions>
+</permissions>

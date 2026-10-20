@@ -101,6 +101,22 @@ jobs:
           python -m aaos_auditor.cli tests/ui/fixtures/Climate --profile aaos --no-config --fail-on high > /dev/null
           code=$?
           test "$code" -eq 1 || { echo "expected exit code 1, got $code"; exit 1; }
+      - name: Platform profile reviews the platform fixture
+        run: |
+          python -m aaos_auditor.cli tests/ui/fixtures/Platform --profile platform --format sarif --fail-on none -o platform.sarif
+          python - <<'EOF'
+          import json
+          sarif = json.load(open("platform.sarif", encoding="utf-8"))
+          results = sarif["runs"][0]["results"]
+          ids = {r["ruleId"] for r in results}
+          assert {"PLATFORM-PROP-DEBUGGABLE", "PLATFORM-SEPOLICY-PERMISSIVE"} <= ids, ids
+          assert all(r.get("partialFingerprints") for r in results), "missing fingerprints"
+          print(f"{len(results)} platform results, all fingerprinted")
+          EOF
+          set +e
+          python -m aaos_auditor.cli tests/ui/fixtures/Platform --profile platform --fail-on high > /dev/null
+          code=$?
+          test "$code" -eq 1 || { echo "expected exit code 1, got $code"; exit 1; }
 
   action:
     name: GitHub Action (self-test)

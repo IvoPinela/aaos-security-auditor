@@ -268,3 +268,60 @@ def test_apk_upload_flow_with_a_real_binary_manifest(page: Page, tmp_path: Path)
     page.click('details[data-lazy="inventory"] summary')
     page.wait_for_function("document.querySelector('details[data-lazy=\"inventory\"] .lazy-content').textContent.includes('Native libraries')")
     assert "libvehicle.so" in page.inner_text('details[data-lazy="inventory"]')
+
+
+# --- platform profile ---------------------------------------------------------------------------
+
+PLATFORM_FIXTURE = Path(__file__).parent / "fixtures" / "Platform"
+
+
+def test_platform_profile_uploads_only_platform_files_and_reports(page: Page, tmp_path: Path) -> None:
+    page.click('button[data-mode="directory"]')
+    page.select_option("#analysis-profile", "platform")
+    page.set_input_files("#directory-files", str(PLATFORM_FIXTURE))
+    page.wait_for_function("document.querySelector('#directory-subtitle').textContent.includes('platform files')")
+    # 9 files in the folder; the filter keeps the 6 the platform profile understands (not out/, README.md or Main.kt).
+    assert "6 platform files of 9" in page.inner_text("#directory-subtitle")
+
+    page.check('input[name="authorized"]')
+    page.click('button[type="submit"]')
+    page.wait_for_selector("#results .result-header", timeout=30_000)
+
+    text = page.inner_text("#results")
+    assert "Platform image sources" in text and "Automotive not applicable" in text and "6 code/configuration files" in text
+    findings = page.inner_text("#finding-list")
+    for expected in (
+        "Image is debuggable (ro.debuggable=1)", "Image is signed with the public AOSP test keys", "SELinux domain hal_x is permissive",
+        "Service carhal runs as root", "com.oem.climate is allowed to install any app", "OemClimate is signed with the platform certificate",
+    ):
+        assert expected in findings, expected
+    assert findings.count("Image is debuggable") == 1  # out/target/build.prop is ignored
+    assert "hal_dev" not in findings  # inside userdebug_or_eng(), which does not exist in user builds
+
+    page.click('details[data-lazy="inventory"] summary')
+    page.wait_for_function("document.querySelector('details[data-lazy=\"inventory\"] .lazy-content').textContent.includes('Platform files analyzed')")
+    inventory = page.inner_text('details[data-lazy="inventory"]')
+    assert "Platform files analyzed (6)" in inventory and "Soong app modules (1)" in inventory and "OemClimate" in inventory
+
+    page.click('details[data-lazy="pentest"] summary')
+    page.wait_for_selector('details[data-lazy="pentest"] .pentest-check')
+    page.click("details.threat-model summary")
+    model = page.inner_text("details.threat-model")
+    assert "T-PLATFORM-BUILD" in model and "T-PLATFORM-MAC" in model and "Binaries and native code" in model
+    assert "PT-PLATFORM-BUILD" in page.inner_text('details[data-lazy="pentest"]')
+
+    name, body = download(page, "export-html", tmp_path)
+    assert "PLATFORM-PROP-DEBUGGABLE" in body and "<script" not in body.lower()
+
+
+def test_platform_profile_rejects_a_folder_without_platform_files(page: Page, tmp_path: Path) -> None:
+    empty = tmp_path / "Nothing"
+    empty.mkdir()
+    (empty / "Main.kt").write_text("class A", encoding="utf-8")
+    page.click('button[data-mode="directory"]')
+    page.select_option("#analysis-profile", "platform")
+    page.set_input_files("#directory-files", str(empty))
+    page.check('input[name="authorized"]')
+    page.click('button[type="submit"]')
+    page.wait_for_selector("#error:not([hidden])")
+    assert "No platform files found" in page.inner_text("#error")

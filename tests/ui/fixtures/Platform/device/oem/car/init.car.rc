@@ -1,0 +1,5 @@
+service carhal /vendor/bin/hw/carhal
+    class hal
+    user root
+on boot
+    chmod 0777 /data/vendor/car

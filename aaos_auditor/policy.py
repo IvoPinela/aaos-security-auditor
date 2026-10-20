@@ -38,7 +38,7 @@ from aaos_auditor.masvs import masvs_summary
 
 CONFIG_NAME = "aaos.toml"
 SEVERITY_ORDER = ("critical", "high", "medium", "low", "info")
-PROFILES = {"aaos", "android_app"}
+PROFILES = {"aaos", "android_app", "platform"}
 KNOWN_SETTINGS = {"profile", "fail_on", "min_severity", "ignore_paths", "disabled_rules"}
 MIN_REASON_LENGTH = 8
 INLINE_IGNORE = re.compile(r"aaos-ignore(?:\[(?P<rules>[A-Za-z0-9_*,\-\s]+)\])?\s*:?\s*(?P<reason>.*)$")
@@ -111,7 +111,7 @@ def parse_policy(text: str) -> Policy:
         if profile in PROFILES:
             policy.settings["profile"] = profile
         else:
-            policy.warnings.append("settings.profile must be 'aaos' or 'android_app'; ignored.")
+            policy.warnings.append("settings.profile must be 'aaos', 'android_app' or 'platform'; ignored.")
     for key, allowed in (("fail_on", ("none", *SEVERITY_ORDER)), ("min_severity", SEVERITY_ORDER)):
         value = raw_settings.get(key)
         if value is not None:

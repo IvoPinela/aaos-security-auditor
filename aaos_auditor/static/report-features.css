@@ -14,3 +14,5 @@
 .threat-model li small{display:block;color:#8294ad;font-size:9.5px}
 .threat-model p{margin:12px 13px 2px;font-size:10px;font-weight:700;color:#d8e5f6;letter-spacing:.03em}
 .threat-model>small{display:block;margin:6px 13px 12px;color:#8294ad;font-size:9.5px}
+.lazy-content h3{margin:16px 0 8px;font-size:11px;font-weight:700;color:#d8e5f6}
+.lazy-content h3:first-child{margin-top:4px}

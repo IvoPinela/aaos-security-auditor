@@ -17,6 +17,16 @@ All notable changes are documented here. The format follows [Keep a Changelog](h
 - Precision corpus: vulnerable and safe samples for every regex rule, plus documented limitations.
 - `SECURITY.md`, `CONTRIBUTING.md`, issue and pull request templates.
 
+### Platform profile
+- **`--profile platform`** reviews AAOS and AOSP image sources, statically and offline: build properties and signing keys
+  (`build.prop`, `*.prop`, `getprop` dumps, `*.mk`), SELinux policy (`*.te`), init scripts (`*.rc`), the privileged permission
+  allow-lists cross-checked with app manifests, default permission grants, and Soong platform-signed apps. 29 rules, each with
+  a knowledge note and a bench-only validation phase in the plan.
+- Precision built in: `userdebug_or_eng()` blocks and `ro.debuggable=1` triggers are skipped, comments are ignored, standard
+  world-accessible nodes and write-only sockets are not reported, and services that declare capabilities are not flagged as root.
+- Large trees: the CLI selects only the relevant files (`out/`, `.git`, `.repo`, `prebuilts` are skipped); the web UI filters in the browser.
+- The web UI gains the profile, a platform inventory, and clearer inventory headings.
+
 ### Packaging
 - **Installable**: `pipx install git+https://github.com/IvoPinela/aaos-security-auditor` gives the `aaos-audit` command
   and the `aaos-web` launcher (localhost only unless you choose another host, with a warning). A `pyproject.toml` builds a wheel

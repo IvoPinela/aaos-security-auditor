@@ -1,0 +1,5 @@
+android_app {
+    name: "OemClimate",
+    certificate: "platform",
+    privileged: true,
+}

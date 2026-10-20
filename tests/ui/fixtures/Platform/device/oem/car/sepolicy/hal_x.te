@@ -1,0 +1,6 @@
+# Vendor HAL policy
+permissive hal_x;
+allow hal_x self:capability sys_admin;
+userdebug_or_eng(`
+  permissive hal_dev;
+')

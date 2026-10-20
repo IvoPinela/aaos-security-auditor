@@ -1,0 +1,4 @@
+ro.product.model=OemCar
+ro.debuggable=1
+ro.build.tags=test-keys
+ro.build.type=userdebug

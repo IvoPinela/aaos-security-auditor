@@ -44,14 +44,31 @@ document.querySelectorAll('.mode-button').forEach((button) => {
   button.addEventListener('click', () => setAnalysisMode(button.dataset.mode));
 });
 fileInput.addEventListener('change', () => selectFile(fileInput.files[0]));
-directoryInput.addEventListener('change', () => {
+// The platform profile targets huge trees (AOSP), so only the files it understands are uploaded.
+const PLATFORM_FILE = /(^|\/)(build\.prop|default\.prop|system\.prop|vendor\.prop|product\.prop|odm\.prop|system_ext\.prop|prop\.default|Android\.bp|AndroidManifest\.xml|aaos\.toml)$|\.(prop|mk|te|rc)$|(^|\/)(privapp-permissions|default-permissions)[^/]*\.xml$/;
+const PLATFORM_IGNORED = /(^|\/)(\.git|\.repo|out|prebuilts|node_modules)\//;
+const platformProfileSelected = () => document.querySelector('#analysis-profile').value === 'platform';
+function selectedDirectoryFiles() {
+  const files = [...directoryInput.files];
+  if (!platformProfileSelected()) return files;
+  return files.filter((file) => {
+    const path = file.webkitRelativePath || file.name;
+    return PLATFORM_FILE.test(path) && !PLATFORM_IGNORED.test(path);
+  });
+}
+function updateDirectorySummary() {
   const files = [...directoryInput.files];
   if (!files.length) return;
   const folderName = (files[0].webkitRelativePath || files[0].name).split('/')[0];
-  const totalBytes = files.reduce((total, file) => total + file.size, 0);
+  const selected = selectedDirectoryFiles();
+  const totalBytes = selected.reduce((total, file) => total + file.size, 0);
   document.querySelector('#directory-title').textContent = folderName;
-  document.querySelector('#directory-subtitle').textContent = `${files.length} files selected · ${(totalBytes / 1024 / 1024).toFixed(2)} MB · only code/configuration is analyzed`;
-});
+  document.querySelector('#directory-subtitle').textContent = platformProfileSelected()
+    ? `${selected.length} platform files of ${files.length} · ${(totalBytes / 1024 / 1024).toFixed(2)} MB · build properties, SELinux, init, permissions and Soong`
+    : `${files.length} files selected · ${(totalBytes / 1024 / 1024).toFixed(2)} MB · only code/configuration is analyzed`;
+}
+directoryInput.addEventListener('change', updateDirectorySummary);
+document.querySelector('#analysis-profile').addEventListener('change', updateDirectorySummary);
 for (const eventName of ['dragenter', 'dragover']) dropzone.addEventListener(eventName, (event) => { event.preventDefault(); dropzone.classList.add('drag'); });
 for (const eventName of ['dragleave', 'drop']) dropzone.addEventListener(eventName, (event) => { event.preventDefault(); dropzone.classList.remove('drag'); });
 dropzone.addEventListener('drop', (event) => { if (event.dataTransfer.files.length) { fileInput.files = event.dataTransfer.files; selectFile(fileInput.files[0]); } });
@@ -81,7 +98,7 @@ function renderReport(report) {
   const checkCount = pentestPlan.checks.length;
   const reportHash = report.apk_sha256 || report.source_sha256 || '';
   const isSourceReport = report.report_type === 'source_directory';
-  const automotiveStatus = isSourceReport && report.analysis_profile !== 'aaos'
+  const automotiveStatus = report.analysis_profile === 'platform' ? 'not applicable' : isSourceReport && report.analysis_profile !== 'aaos'
     ? 'AAOS not selected'
     : report.automotive_feature_declared ? 'declared' : 'not confirmed';
   const connectorNames = report.external_connectors || [];
@@ -120,6 +137,15 @@ function renderLazyPanel(panel) {
   if (panel.dataset.lazy === 'inventory') {
     if (latestReport.report_type === 'source_directory') {
       const profiles = latestReport.profiles_run || [];
+      const platformKinds = Object.entries(latestReport.platform_files || {});
+      const platformFiles = platformKinds.length
+        ? `<h3>Platform files analyzed (${platformKinds.reduce((total, [, count]) => total + count, 0)})</h3><div class="library-list">${platformKinds.map(([kind, count]) => `<code>${escapeHtml(kind)}: ${escapeHtml(count)}</code>`).join('')}</div>`
+        : '';
+      const soongApps = latestReport.platform_apps || [];
+      const soongRows = soongApps.map((app) => `<tr><td>${escapeHtml(app.name)}</td><td>${escapeHtml(app.certificate || '—')}</td><td>${app.privileged ? 'yes' : 'no'}</td><td>${escapeHtml(app.path)}:${escapeHtml(app.line)}</td></tr>`).join('');
+      const platformApps = soongApps.length
+        ? `<h3>Soong app modules (${soongApps.length})</h3><div class="table-wrap"><table><thead><tr><th>Name</th><th>Certificate</th><th>Privileged</th><th>Defined in</th></tr></thead><tbody>${soongRows}</tbody></table></div>`
+        : '';
       const sourceComponents = latestReport.components || [];
       const sourceDeepLinks = latestReport.deep_links || [];
       const aaosApis = latestReport.aaos_api_references || [];
@@ -133,7 +159,7 @@ function renderLazyPanel(panel) {
       const renderReferences = (references) => references.length
         ? `<ul>${references.map((item) => `<li><code>${escapeHtml(item.api)}</code> · ${escapeHtml(item.path)}:${escapeHtml(item.line)}</li>`).join('')}</ul>`
         : '<p>No references found.</p>';
-      content.innerHTML = `<h3>Profiles executed (${profiles.length})</h3><div class="library-list">${profiles.map((profile) => `<code>${escapeHtml(profile)}</code>`).join('')}</div><h3>Components in manifests (${sourceComponents.length})</h3><div class="table-wrap"><table><thead><tr><th>Type</th><th>Name</th><th>Exported</th><th>Permission</th></tr></thead><tbody>${componentRows}</tbody></table></div><h3>Deep links (${sourceDeepLinks.length})</h3><div class="table-wrap"><table><thead><tr><th>Component</th><th>Scheme</th><th>Host</th><th>Path</th></tr></thead><tbody>${deepLinkRows}</tbody></table></div><h3>android.car references (${aaosApis.length})</h3>${renderReferences(aaosApis)}<h3>AndroidX Car App references (${carAppApis.length})</h3>${renderReferences(carAppApis)}<p class="privacy-note">${escapeHtml(latestReport.source_file_count)} accepted files were analyzed. Binaries, downloaded dependencies and ignored directories are not inspected. The scanner does not compile or run the project.</p>`;
+      content.innerHTML = `${platformFiles}${platformApps}<h3>Profiles executed (${profiles.length})</h3><div class="library-list">${profiles.map((profile) => `<code>${escapeHtml(profile)}</code>`).join('')}</div>${latestReport.analysis_profile === 'platform' ? '' : `<h3>Components in manifests (${sourceComponents.length})</h3><div class="table-wrap"><table><thead><tr><th>Type</th><th>Name</th><th>Exported</th><th>Permission</th></tr></thead><tbody>${componentRows}</tbody></table></div><h3>Deep links (${sourceDeepLinks.length})</h3><div class="table-wrap"><table><thead><tr><th>Component</th><th>Scheme</th><th>Host</th><th>Path</th></tr></thead><tbody>${deepLinkRows}</tbody></table></div><h3>android.car references (${aaosApis.length})</h3>${renderReferences(aaosApis)}<h3>AndroidX Car App references (${carAppApis.length})</h3>${renderReferences(carAppApis)}`}<p class="privacy-note">${escapeHtml(latestReport.source_file_count)} accepted files were analyzed. Binaries, downloaded dependencies and ignored directories are not inspected. The scanner does not compile or run the project.</p>`;
       panel.dataset.loaded = 'true';
       return;
     }
@@ -358,8 +384,10 @@ form.addEventListener('submit', async (event) => {
   try {
     const payload = directoryMode ? new FormData() : new FormData(form);
     if (directoryMode) {
-      const files = [...directoryInput.files];
-      if (!files.length) throw new Error('First select the Android project folder.');
+      const files = selectedDirectoryFiles();
+      if (!directoryInput.files.length) throw new Error('First select the Android project folder.');
+      if (!files.length) throw new Error('No platform files found (build.prop, *.te, *.rc, privapp-permissions*.xml, Android.bp, *.mk) in that folder.');
+      if (files.length > 500) throw new Error(`${files.length} platform files is too many for the web interface. Select a device or vendor folder, or use the command line (aaos-audit --profile platform).`);
       payload.append('authorized', 'true');
       payload.append('profile', document.querySelector('#analysis-profile').value);
       payload.append('paths', JSON.stringify(files.map((file) => file.webkitRelativePath || file.name)));

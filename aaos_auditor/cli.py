@@ -17,6 +17,7 @@ from aaos_auditor.sbom import to_cyclonedx
 from aaos_auditor.exporters import SEVERITY_ORDER, compare_with_baseline, filter_by_severity, to_markdown, to_sarif
 from aaos_auditor.knowledge import validate_knowledge_base
 from aaos_auditor.pentest_plan import build_pentest_plan
+from aaos_auditor.platform_scanner import analyze_platform_directory
 from aaos_auditor.policy import apply_policy, load_project_policy, parse_policy
 from aaos_auditor.rules_catalog import known_rule_ids, rule_catalog
 from aaos_auditor.threat_model import build_threat_model
@@ -62,6 +63,49 @@ def collect_source_files(root: Path) -> dict[str, bytes]:
     return files
 
 
+PLATFORM_MAX_WALK_ENTRIES = 500_000
+
+
+def collect_platform_files(root: Path) -> dict[str, bytes]:
+    """Select only the platform files of interest from a (possibly huge) tree; symlinks are never followed."""
+    from aaos_auditor.platform_scanner import IGNORED_PARTS as PLATFORM_IGNORED
+    from aaos_auditor.platform_scanner import MAX_FILE_BYTES, MAX_FILES, MAX_TOTAL_BYTES, platform_file_kind
+
+    root = root.resolve()
+    if not root.is_dir():
+        raise ValueError("The path provided is not a directory.")
+    files: dict[str, bytes] = {}
+    total_bytes = visited = 0
+    for current, directory_names, filenames in os.walk(root, topdown=True, followlinks=False):
+        current_path = Path(current)
+        directory_names[:] = sorted(
+            name for name in directory_names
+            if name.lower() not in PLATFORM_IGNORED and not (current_path / name).is_symlink()
+        )
+        for filename in sorted(filenames):
+            visited += 1
+            if visited > PLATFORM_MAX_WALK_ENTRIES:
+                raise ValueError(
+                    f"The tree exceeds {PLATFORM_MAX_WALK_ENTRIES} entries. Point the tool at the device or vendor directories "
+                    "(for example device/<oem>/<product>) instead of the whole source tree."
+                )
+            path = current_path / filename
+            if path.is_symlink() or platform_file_kind(filename) is None:
+                continue
+            size = path.stat().st_size
+            if size > MAX_FILE_BYTES:
+                continue  # a generated or vendored file, not a hand-written configuration
+            if len(files) >= MAX_FILES:
+                raise ValueError(f"The selection exceeds the {MAX_FILES}-file limit for platform analysis.")
+            total_bytes += size
+            if total_bytes > MAX_TOTAL_BYTES:
+                raise ValueError("The selected files exceed the total size limit for platform analysis.")
+            files[path.relative_to(root).as_posix()] = path.read_bytes()
+    if not files:
+        raise ValueError("No platform files found (build.prop, *.te, *.rc, privapp-permissions*.xml, default-permissions*.xml, Android.bp, *.mk).")
+    return files
+
+
 def _print_rules() -> None:
     for entry in rule_catalog():
         masvs = ",".join(entry["masvs"]) or "-"
@@ -78,7 +122,7 @@ def _load_baseline(path: Path) -> dict[str, Any]:
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Read-only static Android/AAOS source audit")
     parser.add_argument("directory", type=Path, nargs="?", help="Authorized Android project directory")
-    parser.add_argument("--profile", choices=("android_app", "aaos"), default=None, help="Rule profile (default: aaos, or settings.profile from aaos.toml)")
+    parser.add_argument("--profile", choices=("android_app", "aaos", "platform"), default=None, help="Rule profile: aaos or android_app for apps, platform for AAOS image sources (default: aaos, or settings.profile from aaos.toml)")
     parser.add_argument("--format", choices=("json", "sarif", "markdown", "html", "sbom", "ai-context"), default="json", help="Output format; html is a self-contained report, sbom a CycloneDX bill of materials, ai-context a Markdown briefing for an AI assistant")
     parser.add_argument(
         "--import", dest="imports", action="append", type=Path, default=[], metavar="REPORT",
@@ -123,17 +167,31 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     settings: dict = {}
     try:
-        source_files = collect_source_files(args.directory)
+        profile = args.profile
+        if profile is None and not args.no_config:
+            peek = args.config or (args.directory / "aaos.toml")
+            if peek.is_file():
+                profile = parse_policy(peek.read_text(encoding="utf-8")).settings.get("profile")
         policy, policy_path, policy_root = None, "", ""
-        if not args.no_config:
-            if args.config:
-                policy, policy_path = parse_policy(args.config.read_text(encoding="utf-8")), args.config.name
-            else:
-                policy, policy_path, policy_root = load_project_policy(source_files)
-        settings = policy.settings if policy else {}
-        report = analyze_source_directory(
-            source_files, profile=args.profile or settings.get("profile", "aaos"), project_name=args.directory.resolve().name,
-        )
+        if profile == "platform":
+            source_files = collect_platform_files(args.directory)
+            if not args.no_config:
+                config_file = args.config or (args.directory / "aaos.toml")
+                if config_file.is_file():
+                    policy, policy_path = parse_policy(config_file.read_text(encoding="utf-8")), config_file.name
+            settings = policy.settings if policy else {}
+            report = analyze_platform_directory(source_files, project_name=args.directory.resolve().name)
+        else:
+            source_files = collect_source_files(args.directory)
+            if not args.no_config:
+                if args.config:
+                    policy, policy_path = parse_policy(args.config.read_text(encoding="utf-8")), args.config.name
+                else:
+                    policy, policy_path, policy_root = load_project_policy(source_files)
+            settings = policy.settings if policy else {}
+            report = analyze_source_directory(
+                source_files, profile=profile or settings.get("profile", "aaos"), project_name=args.directory.resolve().name,
+            )
         import_summaries = []
         for import_path in args.imports:
             imported = import_static_report(import_path.read_bytes(), import_path.name)
@@ -143,7 +201,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             report["imported_reports"] = import_summaries
         if policy:
             apply_policy(report, policy, source_files, root_prefix=policy_root, config_path=policy_path)
-        report["pentest_plan"] = build_pentest_plan(report["findings"], report.get("deep_links", []))
+        report["pentest_plan"] = build_pentest_plan(report["findings"], report.get("deep_links", []), report.get("analysis_profile"))
         report["threat_model"] = build_threat_model(report)
         if args.baseline:
             report["baseline_comparison"] = compare_with_baseline(report, _load_baseline(args.baseline))

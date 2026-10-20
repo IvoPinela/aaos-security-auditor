@@ -24,6 +24,7 @@ from aaos_auditor.sbom import to_cyclonedx
 from aaos_auditor.knowledge import knowledge_base_status, notes_for_rule, retrieve_context, search_notes
 from aaos_auditor.masvs import MASVS_CONTROLS, MASVS_VERSION, enrich_findings
 from aaos_auditor.pentest_plan import build_pentest_plan
+from aaos_auditor.platform_scanner import analyze_platform_directory
 from aaos_auditor.policy import apply_policy, load_project_policy
 from aaos_auditor.rules_catalog import rule_catalog
 from aaos_auditor.scanner import analyze_apk
@@ -84,7 +85,7 @@ async def analyze(file: UploadFile = File(...), authorized: bool = Form(False)) 
 
     report["ai_advice"] = None
     report["ai_context_sources"] = []
-    report["pentest_plan"] = build_pentest_plan(report["findings"], report.get("deep_links", []))
+    report["pentest_plan"] = build_pentest_plan(report["findings"], report.get("deep_links", []), report.get("analysis_profile"))
     report["threat_model"] = build_threat_model(report)
     if report["findings"] and ai_is_configured():
         knowledge_context, context_sources = retrieve_context(report["findings"])
@@ -122,7 +123,10 @@ async def analyze_directory(
             if total_bytes > MAX_DIRECTORY_UPLOAD_BYTES:
                 raise HTTPException(status_code=413, detail="The directory exceeds the 20 MB total limit.")
             source_files[relative_path] = data
-        report = analyze_source_directory(source_files, profile=profile)
+        if profile == "platform":
+            report = analyze_platform_directory(source_files)
+        else:
+            report = analyze_source_directory(source_files, profile=profile)
         try:
             policy, policy_path, policy_root = load_project_policy(source_files)
         except ValueError as exc:
@@ -141,7 +145,7 @@ async def analyze_directory(
 
     report["ai_advice"] = None
     report["ai_context_sources"] = []
-    report["pentest_plan"] = build_pentest_plan(report["findings"], report.get("deep_links", []))
+    report["pentest_plan"] = build_pentest_plan(report["findings"], report.get("deep_links", []), report.get("analysis_profile"))
     report["threat_model"] = build_threat_model(report)
     if report["findings"] and ai_is_configured():
         # Source findings include paths only as evidence; snippets and source files stay local.
@@ -219,7 +223,7 @@ async def threat_model(request: Request) -> dict[str, object]:
     if not isinstance(report, dict) or not isinstance(report.get("findings"), list):
         raise HTTPException(status_code=422, detail="The report must contain a 'findings' list.")
     report["findings"] = [finding for finding in report["findings"] if isinstance(finding, dict)]
-    report["pentest_plan"] = build_pentest_plan(report["findings"], report.get("deep_links", []))
+    report["pentest_plan"] = build_pentest_plan(report["findings"], report.get("deep_links", []), report.get("analysis_profile"))
     return {"threat_model": build_threat_model(report), "pentest_plan": report["pentest_plan"]}
 
 

@@ -29,7 +29,7 @@ A rule is more than a regex. It is complete only when all of these agree, and th
 | MASVS and CWE | `aaos_auditor/masvs.py` |
 | Knowledge note | `aaos_auditor/knowledge/security_notes.json` |
 | Threat link (optional) | `aaos_auditor/threat_model.py` |
-| **Vulnerable and safe samples** | `tests/test_rule_corpus.py` |
+| **Vulnerable and safe samples** | `tests/test_rule_corpus.py` (app rules) or `tests/test_platform.py` (platform rules, which also need an entry in the sample set) |
 | README mention | the coverage table |
 
 Rules for rules:

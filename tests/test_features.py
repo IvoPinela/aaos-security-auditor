@@ -169,7 +169,7 @@ def test_rule_catalog_covers_every_regex_rule_once() -> None:
     # Every security rule (not project-shape notices) should map to MASVS.
     unmapped = {
         entry["id"] for entry in catalog
-        if not entry["masvs"] and entry["id"] not in {
+        if not entry["masvs"] and entry["scope"] != "platform" and entry["id"] not in {
             "AAOS-CAR-APP-LIBRARY", "AAOS-FEATURE-UNCONFIRMED", "AAOS-MANIFEST-MISSING",
             "ANDROID-BUILD-CONFIG-MISSING", "ANDROID-MANIFEST-XML",
         }

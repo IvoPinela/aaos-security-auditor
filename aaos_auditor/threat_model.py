@@ -77,6 +77,30 @@ THREATS: tuple[dict[str, Any], ...] = (
         "validation": "Confirm on the final release artifact (APK/AAB) and the signing chain.",
     },
     {
+        "id": "T-PLATFORM-BUILD", "stride": "Elevation of privilege / Tampering", "title": "A debuggable, test-signed or unverified image reaches production",
+        "asset": "Integrity and trust of the whole vehicle software stack",
+        "rules": ("PLATFORM-PROP-*", "PLATFORM-MK-*"),
+        "validation": "On an isolated bench with the exact release image, read the build properties and verified boot state; never on a road vehicle.",
+    },
+    {
+        "id": "T-PLATFORM-MAC", "stride": "Elevation of privilege", "title": "Mandatory access control is weakened",
+        "asset": "Containment of every compromised app, daemon and HAL",
+        "rules": ("PLATFORM-SEPOLICY-*", "PLATFORM-INIT-SELINUX-DISABLED", "PLATFORM-INIT-SU-SERVICE"),
+        "validation": "Confirm Enforcing mode and the list of permissive or unconfined domains on the shipped image, on a bench.",
+    },
+    {
+        "id": "T-PLATFORM-PRIVILEGE", "stride": "Elevation of privilege", "title": "System apps and services hold more privilege than they need",
+        "asset": "Vehicle control, user data and other apps",
+        "rules": ("PLATFORM-PRIVAPP-*", "PLATFORM-INIT-ROOT-SERVICE", "PLATFORM-INIT-WORLD-ACCESSIBLE", "PLATFORM-BP-*", "PLATFORM-DEFAULT-GRANT-*"),
+        "validation": "Compare allow-lists, root services, socket and directory modes with what each component needs, on the built image.",
+    },
+    {
+        "id": "T-PLATFORM-HARDENING", "stride": "Information disclosure / Tampering", "title": "Debugging channels and kernel hardening are weakened",
+        "asset": "Kernel memory layout, logs and the debugging interface",
+        "rules": ("PLATFORM-INIT-KERNEL-HARDENING-OFF", "PLATFORM-INIT-ADB-ENABLED"),
+        "validation": "Check adb state and kernel sysctl values on the shipped image, on a bench.",
+    },
+    {
         "id": "T-SUPPLY", "stride": "Tampering / Elevation of privilege", "title": "Dependency with a known vulnerability",
         "asset": "Third-party code inside the app process",
         "rules": ("OSV-SCANNER-*", "TRIVY-CVE-*", "TRIVY-GHSA-*", "TRIVY-GO-*", "ANDROID-GRADLE-INSECURE-REPO", "ANDROID-DEPENDENCY-DYNAMIC-VERSION"),
@@ -92,6 +116,7 @@ PHASES: tuple[tuple[str, str, str], ...] = (
     ("5-data", "Data, secrets and cryptography", "Storage, backups, secrets and cryptography use reviewed."),
     ("6-aaos", "AAOS vehicle and privacy", "android.car permissions and vehicle data flows justified."),
     ("7-supply", "Supply chain", "Dependencies and SDKs compared against security advisories."),
+    ("8-platform", "Platform image hardening", "Build properties, SELinux, init and privileged permissions confirmed on the exact image to ship."),
 )
 CHECK_PHASE = {
     "PT-SCOPE": "1-scope",
@@ -102,6 +127,7 @@ CHECK_PHASE = {
     "PT-DATA": "5-data", "PT-BACKUP": "5-data", "PT-FILEPROVIDER": "5-data", "PT-CRYPTO": "5-data", "PT-SECRETS": "5-data",
     "PT-AAOS-API": "6-aaos", "PT-AAOS-PERMS": "6-aaos", "PT-PRIVACY-EGRESS": "6-aaos",
     "PT-DEPENDENCIES": "7-supply",
+    "PT-PLATFORM-BUILD": "8-platform", "PT-PLATFORM-MAC": "8-platform", "PT-PLATFORM-PRIVILEGE": "8-platform",
 }
 
 NOT_ASSESSED = (
@@ -110,6 +136,15 @@ NOT_ASSESSED = (
     "Permission protection levels on the OEM's AAOS build",
     "Runtime behavior (reachability, initialization order, granted permissions)",
     "Native libraries and obfuscated code",
+)
+
+
+PLATFORM_NOT_ASSESSED = (
+    "Binaries and native code (HALs, services, kernel modules)",
+    "The built image, its partitions and its signing keys",
+    "Kernel configuration and device tree",
+    "Files that were not part of the selected tree (vendor and product partitions, other repositories)",
+    "Runtime behavior on a real device or an emulator",
 )
 
 
@@ -142,6 +177,8 @@ def build_threat_model(report: dict[str, Any]) -> dict[str, Any]:
          "detail": f"{len(car_permissions)} android.car permission(s); {len(report.get('aaos_api_references', []))} vehicle API reference(s)"},
         {"id": "sensors", "name": "Location and sensors", "present": bool(permissions & {"android.permission.ACCESS_FINE_LOCATION", "android.permission.ACCESS_COARSE_LOCATION", "android.permission.RECORD_AUDIO", "android.permission.CAMERA"}),
          "detail": "Location, microphone or camera requested in the manifest"},
+        {"id": "platform", "name": "Platform image", "present": report.get("analysis_profile") == "platform" or any(_matches(rule, ("PLATFORM-*",)) for rule in rule_ids),
+         "detail": f"{len(report.get('platform_apps', []))} Soong app module(s); build properties, SELinux, init and privileged permissions"},
         {"id": "supply", "name": "Dependencies", "present": bool(report.get("dependencies")) or any(_matches(rule, ("OSV-SCANNER-*", "TRIVY-*", "ANDROID-GRADLE-*", "ANDROID-DEPENDENCY-*")) for rule in rule_ids),
          "detail": f"{len(report.get('dependencies', []))} declared dependencies; advisories only when OSV-Scanner or Trivy results are imported"},
     ]
@@ -168,8 +205,8 @@ def build_threat_model(report: dict[str, Any]) -> dict[str, Any]:
         if checks:
             phases.append({"id": phase_id, "name": name, "goal": goal, "checks": checks})
 
-    not_assessed = list(NOT_ASSESSED)
-    if not any(surface["id"] == "supply" and surface["present"] for surface in surfaces):
+    not_assessed = list(PLATFORM_NOT_ASSESSED if report.get("analysis_profile") == "platform" else NOT_ASSESSED)
+    if report.get("analysis_profile") != "platform" and not any(surface["id"] == "supply" and surface["present"] for surface in surfaces):
         not_assessed.insert(0, "Dependencies and CVEs (import OSV-Scanner or Trivy to cover)")
     return {
         "mode": "static_derivation",
@@ -192,6 +229,6 @@ def with_threat_model(report: dict[str, Any]) -> dict[str, Any]:
 
     enriched = {**report}
     findings = [finding for finding in enriched.get("findings", []) if isinstance(finding, dict)]
-    enriched.setdefault("pentest_plan", build_pentest_plan(findings, enriched.get("deep_links", [])))
+    enriched.setdefault("pentest_plan", build_pentest_plan(findings, enriched.get("deep_links", []), enriched.get("analysis_profile")))
     enriched["threat_model"] = build_threat_model(enriched)
     return enriched

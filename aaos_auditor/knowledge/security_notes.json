@@ -540,5 +540,88 @@
       "CWE-939"
     ],
     "content": "A browsable http(s) intent filter without android:autoVerify is a plain deep link: the system may show a chooser and another app can declare the same filter and receive the link and its data. Verified App Links bind the host to the app through /.well-known/assetlinks.json and open the app directly. Recommend autoVerify on every web filter, a published assetlinks.json for each host with the release signing certificate, and no tokens, session identifiers or personal data in link parameters. Custom-scheme links (myapp://) cannot be verified at all, so treat their input as untrusted. Confirm the verification state on an emulator with adb shell pm get-app-links, because the manifest alone does not prove the assetlinks file is correct."
+  },
+  {
+    "id": "platform-build-properties",
+    "title": "Build properties, signing keys and verified boot",
+    "rule_ids": [
+      "PLATFORM-PROP-*",
+      "PLATFORM-MK-*"
+    ],
+    "cwe": [
+      "CWE-489",
+      "CWE-250",
+      "CWE-306",
+      "CWE-321",
+      "CWE-353"
+    ],
+    "references": [
+      "https://source.android.com/docs/security/features/verifiedboot"
+    ],
+    "content": "A production vehicle image should be a user build: ro.debuggable=0, ro.secure=1, ro.adb.secure=1, signed with release keys, with a locked bootloader and verified boot (AVB and dm-verity) on. ro.debuggable=1 or ro.secure=0 gives adb a root shell and lets debuggers attach to any app. ro.build.tags containing test-keys, or a default dev certificate that points at the AOSP testkey, means the image, OTA packages and platform-signed apps are trusted under keys that are public. eng and userdebug builds are for engineering and test fleets, not for vehicles that leave the factory. A getprop dump may legitimately show orange or an unlocked bootloader on a development unit; confirm which image the file describes before concluding. ro.control_privapp_permissions=log only reports violations of the privileged permission allow-list; enforce is the production setting. Properties in sources describe intent, so confirm the final values on the built image on an isolated bench, never on a road vehicle."
+  },
+  {
+    "id": "platform-sepolicy",
+    "title": "SELinux policy: permissive domains and over-broad rules",
+    "rule_ids": [
+      "PLATFORM-SEPOLICY-*"
+    ],
+    "cwe": [
+      "CWE-693",
+      "CWE-250",
+      "CWE-732"
+    ],
+    "references": [
+      "https://source.android.com/docs/security/features/selinux"
+    ],
+    "content": "SELinux is the containment layer that limits what a compromised daemon, HAL or app can do. A permissive domain logs violations instead of blocking them, so it behaves as if it had no policy. unconfined_domain() and wildcard permission sets do the same in a less visible way. Powerful capabilities such as sys_module, sys_admin, sys_rawio, sys_ptrace and dac_override should be rare and kept out of app domains and network-facing daemons. Anything inside userdebug_or_eng() is stripped from user builds, so it is skipped here: it does not exist in a production image. permissive is normal during bring-up; the finding matters when it survives into a release branch. This is a lint of text rules, not a full policy analysis: it does not know the final compiled policy or neverallow assertions, so confirm with the policy that actually ships."
+  },
+  {
+    "id": "platform-init",
+    "title": "Init scripts: root services, open sockets and disabled hardening",
+    "rule_ids": [
+      "PLATFORM-INIT-*"
+    ],
+    "cwe": [
+      "CWE-693",
+      "CWE-732",
+      "CWE-250"
+    ],
+    "references": [
+      "https://android.googlesource.com/platform/system/core/+/refs/heads/main/init/README.md"
+    ],
+    "content": "In init scripts a service without a user option runs as root (the init documentation says the default is root), so every daemon should name a dedicated user, group and SELinux domain. A service that lists capabilities has been deliberately restricted and is not reported. A socket mode that lets everyone read and write, a world-writable chmod or mkdir, setenforce 0, writes that weaken kernel hardening (kptr_restrict, dmesg_restrict, randomize_va_space, perf_event_paranoid) and enabling adb root are all ways to undo protections that the rest of the system relies on. Standard world-accessible device nodes such as /dev/null and /dev/binder are expected and ignored. Sections triggered by ro.debuggable=1 only run on debuggable builds and are skipped. This checks scripts as written; it cannot know which services start on a given product."
+  },
+  {
+    "id": "platform-privapp-permissions",
+    "title": "Privileged permission allow-lists",
+    "rule_ids": [
+      "PLATFORM-PRIVAPP-*"
+    ],
+    "cwe": [],
+    "references": [
+      "https://source.android.com/docs/core/permissions/perms-allowlist"
+    ],
+    "content": "A privileged app (in priv-app) can only hold a privileged permission if the partition's allow-list in etc/permissions grants it with a permission element, and a deny-permission element withholds it. On Android 9 and later the platform treats an unlisted privileged permission as a violation, and with enforcement (ro.control_privapp_permissions=enforce) the device does not boot, so a missing entry is both a build break and a signal that nobody reviewed the permission. The reverse also matters: an allow-list that grants a permission the app does not request is an unused privilege that widens the damage if the app is compromised. Keep the allow-list short, review who can install apps, grant runtime permissions, inject input, read the screen, act across users or control the vehicle, and test only on an emulator or isolated bench. Cross-checks need the app's AndroidManifest.xml in the selected files; without it only the grants themselves are reviewed."
+  },
+  {
+    "id": "platform-default-permissions",
+    "title": "Default runtime permission grants",
+    "rule_ids": [
+      "PLATFORM-DEFAULT-GRANT-*"
+    ],
+    "cwe": [],
+    "references": [],
+    "content": "default-permissions files grant runtime permissions to named packages without asking the user. For location, microphone, camera, contacts, SMS and call log this is a privacy decision, and fixed=true also stops the user from revoking it. In a car, location plus vehicle data can reveal routes and routines, and several people share the vehicle. Grant sensitive permissions only when a feature needs them, avoid fixed=true, document the reason, and make sure the app has a lawful basis to use the data."
+  },
+  {
+    "id": "platform-soong-signing",
+    "title": "Platform-signed apps in Soong",
+    "rule_ids": [
+      "PLATFORM-BP-*"
+    ],
+    "cwe": [],
+    "references": [],
+    "content": "System apps in the platform tree are built with Soong (Android.bp), not Gradle. certificate: \"platform\" signs the app with the platform key, so it typically runs with the system UID and the highest trust an app can have; with privileged: true it also lives in priv-app. Any exported component or injectable input in such an app becomes a platform-level entry point. Keep platform-signed apps small, avoid exporting components, validate every input and review them first. platform_apis: true ties the app to hidden APIs of the exact platform build and is not a vulnerability. This is an inventory and review pointer, not proof of a flaw."
   }
 ]

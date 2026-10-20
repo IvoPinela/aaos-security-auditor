@@ -121,6 +121,20 @@ RULE_CWE: dict[str, tuple[str, ...]] = {
     "AAOS-MEDIA-BROWSER-CALLER-VALIDATION": ("CWE-940",),
     "ANDROID-DEEPLINK-UNVERIFIED": ("CWE-939",),
     "ANDROID-GRADLE-INSECURE-REPO": ("CWE-319",),
+    "PLATFORM-PROP-DEBUGGABLE": ("CWE-489",),
+    "PLATFORM-PROP-INSECURE-ADBD": ("CWE-250",),
+    "PLATFORM-PROP-ADB-UNAUTHENTICATED": ("CWE-306",),
+    "PLATFORM-PROP-TEST-KEYS": ("CWE-321",),
+    "PLATFORM-MK-TEST-KEYS": ("CWE-321",),
+    "PLATFORM-PROP-VERIFIED-BOOT": ("CWE-353",),
+    "PLATFORM-MK-AVB-DISABLED": ("CWE-353",),
+    "PLATFORM-PROP-SELINUX-PERMISSIVE": ("CWE-693",),
+    "PLATFORM-SEPOLICY-PERMISSIVE": ("CWE-693",),
+    "PLATFORM-SEPOLICY-UNCONFINED": ("CWE-250",),
+    "PLATFORM-SEPOLICY-ALLOW-ALL": ("CWE-732",),
+    "PLATFORM-INIT-SELINUX-DISABLED": ("CWE-693",),
+    "PLATFORM-INIT-WORLD-ACCESSIBLE": ("CWE-732",),
+    "PLATFORM-INIT-ROOT-SERVICE": ("CWE-250",),
     "ANDROID-DEPENDENCY-DYNAMIC-VERSION": ("CWE-1357",),
 }
 
@@ -182,7 +196,9 @@ def enrich_findings(findings: list[dict[str, Any]]) -> list[dict[str, Any]]:
     for finding in findings:
         rule_id = str(finding.get("rule_id", ""))
         finding.setdefault("cwe", cwe_for_rule(rule_id))
-        finding.setdefault("masvs", masvs_for_rule(rule_id) or masvs_for_cwe(list(finding.get("cwe") or [])))
+        # MASVS describes mobile apps, so platform findings carry CWE only; imported findings derive MASVS from their CWE.
+        derived = [] if rule_id.startswith("PLATFORM-") else masvs_for_cwe(list(finding.get("cwe") or []))
+        finding.setdefault("masvs", masvs_for_rule(rule_id) or derived)
     assign_fingerprints(findings)
     return findings
 

@@ -43,13 +43,14 @@ Generic mobile scanners know nothing about that chain. This tool does: it flags 
 
 | | |
 | --- | --- |
-| 🔎 **56 deterministic rules** | Manifest, network, WebView, IPC, storage, crypto, secrets, build, supply chain and AAOS checks. Comment-aware, with a vulnerable-and-safe test corpus per rule. Evidence is always `path:line`, never code or secret values |
+| 🔎 **89 deterministic rules** (60 for apps, 29 for the platform image) | Manifest, network, WebView, IPC, storage, crypto, secrets, build, supply chain and AAOS checks. Comment-aware, with a vulnerable-and-safe test corpus per rule. Evidence is always `path:line`, never code or secret values |
 | 🚘 **AAOS-aware profile** | Automotive feature declaration, privileged `android.car` permissions, vehicle API references, Car App Library, vehicle-data egress review |
+| 🖥️ **Platform profile** | Reviews the OS image sources: build properties and signing, SELinux, init scripts, privileged permissions and Soong. Debuggable images, test keys, permissive domains and over-privileged system apps |
 | 🧭 **MASVS + CWE on every finding** | Triage by standard, with a per-control summary in each report |
 | 🧩 **7 scanner connectors** | Merge Semgrep, SARIF/CodeQL, Gitleaks, OSV-Scanner, Trivy, MobSF and Android Lint into one report |
 | 🛡️ **Derived threat model** | Attack surface, STRIDE threats and a 7-phase manual validation plan |
 | 🤖 **AI-ready by default** | A sanitized Markdown briefing for Claude or any assistant, hardened against prompt injection |
-| 🧠 **Curated knowledge base** | 34 notes retrieved per rule, with MASVS, CWE and primary sources |
+| 🧠 **Curated knowledge base** | 43 notes retrieved per rule, with MASVS, CWE and primary sources |
 | ⚙️ **CI-ready** | A **GitHub Action**, SARIF for code scanning, `--fail-on`, baselines that gate only on *new* findings, stable fingerprints |
 | 📦 **SBOM and reports** | CycloneDX SBOM from Gradle, a self-contained HTML report for non-technical readers, plus JSON, SARIF, Markdown and CSV |
 | 🗂️ **Project policy** | `aaos.toml` with settings and **justified, expiring suppressions**, plus inline `aaos-ignore` comments |
@@ -138,7 +139,7 @@ jobs:
       - uses: IvoPinela/aaos-security-auditor@main    # pin a tag or commit SHA in real projects
         with:
           path: .                  # the Android project directory
-          profile: aaos            # or android_app; empty uses aaos.toml or aaos
+          profile: aaos            # aaos, android_app or platform; empty uses aaos.toml or aaos
           fail-on: high            # none | info | low | medium | high | critical
 ```
 
@@ -205,6 +206,7 @@ Pentesting here means **structured, authorized, manual validation guided by stat
 | Threat model (STRIDE, AAOS chain, privacy) | ✅ Available | Derived from findings, with what is *not* covered |
 | Phased validation plan (7 phases, task state) | ✅ Available | Scope, static confirmation, IPC, network, data and crypto, AAOS vehicle and privacy, supply chain |
 | Scanner fusion and dependency CVEs | ✅ Available | Semgrep, CodeQL, Gitleaks, OSV, Trivy, Lint, MobSF |
+| Platform image review (build properties, SELinux, init, privapp) | ✅ Available | Static review of AAOS image sources, with a bench-only validation phase |
 | AI triage and remediation skills | ✅ Available | Claude Code skills with evaluation cases |
 | Per-rule MASTG test and MASWE weakness IDs | 🔜 Next | Needs verification against official sources |
 | Emulator lab for dynamic checks (opt-in, isolated) | 🧭 Planned | Separate stage, AAOS emulator only |
@@ -250,6 +252,42 @@ The SBOM lists **declared** dependencies from `build.gradle`, `build.gradle.kts`
 notation, version catalog references, platform/BOM entries). Every entry says whether its version is `pinned`, `dynamic`
 (`+`, ranges, `latest`, `SNAPSHOT`) or `unresolved` (a variable or a BOM decides it). Transitive dependencies are **not**
 resolved, and the SBOM says so in its metadata; run a resolver-based tool on the built graph when you need the full tree.
+
+## 🖥️ The platform profile: the OS image, not just the apps
+
+Apps are only half of a vehicle. The operating system image decides whether any app is contained: a single `ro.debuggable=1`
+or one `permissive` SELinux domain in a production image undoes the security of everything above it. The `platform` profile
+reviews the **configuration files of an AAOS or AOSP source tree**, statically and offline.
+
+```bash
+aaos-audit ./aosp/device/oem/car --profile platform
+aaos-audit ./aosp/device/oem/car --profile platform --format html -o platform.html
+```
+
+<p align="center">
+  <img src="docs/screenshots/platform.png" alt="Platform report: files analyzed, Soong modules and findings for build properties, SELinux, init and privileged permissions" width="720">
+</p>
+
+| Area | Files it reads | What it looks for |
+| --- | --- | --- |
+| **Build properties and signing** | `build.prop`, `default.prop`, other `*.prop`, `getprop` dumps, `*.mk` | `ro.debuggable=1`, `ro.secure=0`, `ro.adb.secure=0`, `test-keys`, `userdebug` or `eng` builds, unlocked bootloader, dm-verity off, `BOARD_AVB_ENABLE := false`, the public test signing key, privileged permissions only logged |
+| **SELinux** | `*.te` | `permissive` domains, `unconfined_domain`, wildcard permissions, `sys_module`, `sys_admin`, `dac_override` and similar capabilities |
+| **Init scripts** | `*.rc` | Services running as root, the `su` domain, `setenforce 0`, world-accessible sockets and directories, kernel hardening switched off, adb enabled |
+| **Privileged permissions** | `privapp-permissions-*.xml`, plus the apps' manifests | Powerful grants (install apps, inject input, read the screen, act across users), who can control the vehicle, grants an app never requests, and privileged permissions that are requested but not listed |
+| **Default permissions** | `default-permissions-*.xml` | Location, microphone, camera and contacts granted by default, and `fixed="true"` grants the user cannot revoke |
+| **Soong** | `Android.bp` | Apps signed with the platform certificate and privileged apps, as an inventory for review |
+
+Built to avoid noise: anything inside `userdebug_or_eng(...)` and init sections triggered by `ro.debuggable=1` are skipped because they
+do not exist in user builds; comments are ignored; standard world-accessible device nodes such as `/dev/null` and write-only logging
+sockets are not reported; a service that declares `capabilities` has been deliberately restricted. The same `aaos.toml` policy,
+baselines, SARIF, HTML, AI briefing and Action work for platform reports (`profile = "platform"` in `aaos.toml` selects it).
+
+**Big trees.** Point it at the device or vendor directories. The command line picks only the files above (it skips `out/`, `.git`,
+`.repo` and `prebuilts`; up to 5,000 files, 1 MB each, 100 MB in total) and the web interface filters in your browser before uploading.
+
+**What it does not do.** It does not build, boot or unpack an image, and it does not analyze binaries or native code (HALs and services),
+the kernel configuration, VHAL property configuration or the compiled SELinux policy with its `neverallow` assertions. Properties and
+policy in sources describe intent: confirm the final values on the exact image you ship, on an isolated bench, never on a road vehicle.
 
 ## Connectors
 
@@ -315,7 +353,7 @@ Each ships with evaluation cases. Dynamic-action skills (Frida, objection) were 
 
 | Option | Effect |
 | --- | --- |
-| `--profile aaos\|android_app` | Rule profile (default `aaos`) |
+| `--profile aaos\|android_app\|platform` | Rule profile: apps, or the OS image sources (default `aaos`) |
 | `--format json\|sarif\|markdown\|html\|sbom\|ai-context` | Output format |
 | `-o <file>` | Write UTF-8 output to a file |
 | `--import <report>` | Merge an external report (repeatable) |
@@ -343,7 +381,7 @@ Interactive docs at `/docs`.
 
 ## Knowledge base
 
-`aaos_auditor/knowledge/security_notes.json` holds 33 curated notes with `rule_ids` (exact IDs, globs such as `ANDROID-PERM-*`, or `*`), `masvs`, `cwe` and `references`. Retrieval is capped at 6,000 characters and ranked by the worst matching finding, so the highest-impact guidance is never cut. Validate with `python -m aaos_auditor.cli --check-knowledge`; use your own file with `AAOS_KNOWLEDGE_FILE`.
+`aaos_auditor/knowledge/security_notes.json` holds 43 curated notes with `rule_ids` (exact IDs, globs such as `ANDROID-PERM-*`, or `*`), `masvs`, `cwe` and `references`. Retrieval is capped at 6,000 characters and ranked by the worst matching finding, so the highest-impact guidance is never cut. Validate with `python -m aaos_auditor.cli --check-knowledge`; use your own file with `AAOS_KNOWLEDGE_FILE`.
 
 ## Project layout
 
@@ -351,6 +389,7 @@ Interactive docs at `/docs`.
 aaos_auditor/            the installable package
   cli.py, main.py        command line and FastAPI web app (aaos-audit, aaos-web)
   directory_scanner.py   comment-aware rule engine; scanner.py analyzes APKs
+  platform_scanner.py    OS image review: properties, SELinux, init, privapp, Soong
   connectors.py          importers for external scanners
   masvs.py, car_permissions.py, threat_model.py, sbom.py, html_report.py, ai_context.py ...
   static/                web interface
@@ -378,6 +417,7 @@ The suite fails if a rule has no MASVS mapping, no knowledge note, or no vulnera
 
 ## Limits
 
+- The platform profile reads configuration text only; it does not analyze binaries, native code, kernel configuration or the compiled SELinux policy.
 - Heuristic results. A flagged permission or component is context for review, not proof of exploitation, and this is not a MASVS certification.
 - Directory analysis does not run Gradle, resolve version catalogs or variants, inspect binaries, or see the merged manifest. Confirm findings against the real build.
 - Uploads pass through process memory and are not persisted. Do not expose the server publicly without authentication, TLS and rate limits.
