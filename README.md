@@ -9,7 +9,7 @@ Find what matters in an in-vehicle app **before it reaches the road**: reproduci
 ![Python](https://img.shields.io/badge/python-3.11%2B-blue)
 ![FastAPI](https://img.shields.io/badge/FastAPI-web%20%26%20API-009688)
 ![Rules](https://img.shields.io/badge/rules-54-orange)
-![Standards](https://img.shields.io/badge/OWASP%20MASVS-v2-red)
+![Standards](https://img.shields.io/badge/OWASP%20MASVS%20%7C%20MASWE%20%7C%20MASTG-red)
 ![Output](https://img.shields.io/badge/SARIF-2.1.0-purple)
 [![CI](https://github.com/IvoPinela/aaos-security-auditor/actions/workflows/ci.yml/badge.svg)](https://github.com/IvoPinela/aaos-security-auditor/actions/workflows/ci.yml)
 ![License](https://img.shields.io/badge/license-MIT-green)
@@ -63,7 +63,7 @@ flowchart LR
     I1[APK] --> R[Static rules<br/>54 checks]
     I2[Source directory] --> R
     X[Semgrep · CodeQL · Gitleaks<br/>OSV · Trivy · Lint · MobSF] --> F
-    R --> F[Findings<br/>MASVS + CWE]
+    R --> F[Findings<br/>MASVS + MASWE + MASTG + CWE]
     F --> T[Threat model<br/>+ validation plan]
     F --> B[AI briefing]
     K[(Knowledge<br/>base)] --> B
@@ -202,7 +202,7 @@ Pentesting here means **structured, authorized, manual validation guided by stat
 
 | Stage | Status | What it is |
 | --- | --- | --- |
-| Static findings with MASVS and CWE | ✅ Available | Reproducible evidence, no execution |
+| Static findings with MASVS, MASWE, MASTG and CWE | ✅ Available | Reproducible evidence, no execution |
 | Threat model (STRIDE, AAOS chain, privacy) | ✅ Available | Derived from findings, with what is *not* covered |
 | Phased validation plan (7 phases, task state) | ✅ Available | Scope, static confirmation, IPC, network, data and crypto, AAOS vehicle and privacy, supply chain |
 | Scanner fusion and dependency CVEs | ✅ Available | Semgrep, CodeQL, Gitleaks, OSV, Trivy, Lint, MobSF |
@@ -253,6 +253,22 @@ The SBOM lists **declared** dependencies from `build.gradle`, `build.gradle.kts`
 notation, version catalog references, platform/BOM entries). Every entry says whether its version is `pinned`, `dynamic`
 (`+`, ranges, `latest`, `SNAPSHOT`) or `unresolved` (a variable or a BOM decides it). Transitive dependencies are **not**
 resolved, and the SBOM says so in its metadata; run a resolver-based tool on the built graph when you need the full tree.
+
+## 🧭 From a finding to the test that confirms it
+
+Every finding carries the standards a reviewer needs, so triage and manual validation use the same vocabulary:
+
+| Field | Meaning | Coverage |
+| --- | --- | --- |
+| `masvs` | Verification control (OWASP MASVS v2) | App rules and imported findings |
+| `maswe` | Weakness (OWASP MAS weakness enumeration) | 46 app rules |
+| `mastg` | Test that confirms it (OWASP MASTG), static counterparts only | 30 app rules |
+| `cwe` | Common Weakness Enumeration | Where the mapping is unambiguous |
+
+Example: `ANDROID-DEBUGGABLE` → `MASVS-RESILIENCE-4`, `MASWE-0063` (Debug Mechanisms Not Disabled), `MASTG-TEST-0226`
+(Debuggable Flag Enabled in the AndroidManifest), `CWE-489`. IDs and titles are copied from the official OWASP MAS lists and a
+test rejects any ID that is not in them. A rule is left unmapped when no official entry matches, and platform rules carry CWE only
+because MASVS, MASWE and MASTG describe mobile apps.
 
 ## 🖥️ The platform profile: the OS image, not just the apps
 
